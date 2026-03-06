@@ -1,0 +1,11 @@
+# Vivado generated files
+vivado/
+
+# IDE
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
