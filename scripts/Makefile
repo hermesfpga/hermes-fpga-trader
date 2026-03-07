@@ -1,20 +1,93 @@
 # Makefile settings
-# SHELL := bash 
+# SHELL := bash
 .ONESHELL:
+
+PROJECT_NAME = kria_zynq
+XSA_FILE = $(PROJECT_NAME).xsa
+BIT_FILE = $(PROJECT_NAME).bit
+
+# Host path where artifacts are stored
+ARTIFACTS_HOST_DIR = /home/buildserver/artifacts
+
+# Path to artifacts inside the container
+ARTIFACTS_CONTAINER_DIR = /artifacts
 
 DOCKER_IMAGE_VIVADO_NAME = vivado
 DOCKER_IMAGE_VIVADO_TAG  = 2025.2
 
 DOCKER_IMAGE = ${DOCKER_IMAGE_VIVADO_NAME}:${DOCKER_IMAGE_VIVADO_TAG}
-PROJECT_PATH=$(realpath ../)
+
+PROJECT_PATH = $(realpath ../)
+
+# This path must follow scripts/setup_and_build_project.tcl
+VIVADO_EXPORT_DIR = vivado
+
+# Git information
+GIT_BRANCH_RAW  := $(shell git -C $(PROJECT_PATH) rev-parse --abbrev-ref HEAD)
+GIT_COMMIT      := $(shell git -C $(PROJECT_PATH) rev-parse --short HEAD)
+
+# Sanitize branch name for filesystem safety
+# Replace any character that is not [a-zA-Z0-9_-] with '_'
+GIT_BRANCH_SAFE := $(shell echo "$(GIT_BRANCH_RAW)" | sed 's/[^a-zA-Z0-9_-]/_/g')
+
+# Timestamp used for artifact directories
+BUILD_TIMESTAMP := $(shell date +%Y%m%d_%H%M%S)
+
+# Final unique build identifier
+BUILD_ID := $(PROJECT_NAME)_$(BUILD_TIMESTAMP)_$(GIT_BRANCH_SAFE)_$(GIT_COMMIT)
+
+# File storing the most recent successful hardware build folder
+LATEST_BUILD_FILE = $(ARTIFACTS_HOST_DIR)/$(PROJECT_NAME)_latest_build.txt
+
+# File storing the most recent successful device tree folder
+LATEST_DT_FILE = $(ARTIFACTS_HOST_DIR)/$(PROJECT_NAME)_latest_devicetree.txt
+
 
 build:
+	mkdir -p $(ARTIFACTS_HOST_DIR)
+	mkdir -p $(ARTIFACTS_HOST_DIR)/$(BUILD_ID)
+
 	docker run --network bridge \
 		--rm \
 		-e LOCAL_UID=$$(id -u) \
 		-e LOCAL_GID=$$(id -g) \
 		-v ${PROJECT_PATH}:/workspace:rw \
+		-v $(ARTIFACTS_HOST_DIR):$(ARTIFACTS_CONTAINER_DIR):rw \
 		-w /workspace \
 		$(DOCKER_IMAGE) \
-		vivado -mode batch -notrace -source ./scripts/create_project_and_gen_bitstream.tcl
-		
+		bash -lc ' \
+			vivado -mode batch -notrace -source ./scripts/create_project_and_gen_bitstream.tcl && \
+			cp $(VIVADO_EXPORT_DIR)/$(XSA_FILE) $(ARTIFACTS_CONTAINER_DIR)/$(BUILD_ID)/$(XSA_FILE) && \
+			cp $(VIVADO_EXPORT_DIR)/$(BIT_FILE) $(ARTIFACTS_CONTAINER_DIR)/$(BUILD_ID)/$(BIT_FILE) && \
+			ls -l $(ARTIFACTS_CONTAINER_DIR)/$(BUILD_ID) \
+		' || { rm -rf $(ARTIFACTS_HOST_DIR)/$(BUILD_ID); exit 1; }
+
+	echo "$(BUILD_ID)" > $(LATEST_BUILD_FILE)
+
+
+devicetree:
+	test -f $(LATEST_BUILD_FILE)
+	BUILD_ID="$$(cat $(LATEST_BUILD_FILE))"
+	mkdir -p $(ARTIFACTS_HOST_DIR)/$$BUILD_ID/dt
+
+	docker run --network bridge \
+		--rm \
+		-e LOCAL_UID=$$(id -u) \
+		-e LOCAL_GID=$$(id -g) \
+		-v ${PROJECT_PATH}:/workspace:rw \
+		-v $(ARTIFACTS_HOST_DIR):$(ARTIFACTS_CONTAINER_DIR):rw \
+		-w /workspace \
+		$(DOCKER_IMAGE) \
+		bash -lc ' \
+			BUILD_ID='"$$BUILD_ID"' && \
+			xsct -eval "sdtgen set_dt_param -xsa $(ARTIFACTS_CONTAINER_DIR)/$$BUILD_ID/$(XSA_FILE) -dir $(ARTIFACTS_CONTAINER_DIR)/$$BUILD_ID/dt; sdtgen generate_sdt; exit" && \
+			gcc -I $(ARTIFACTS_CONTAINER_DIR)/$$BUILD_ID/dt -E -nostdinc -undef -D__DTS__ -x assembler-with-cpp \
+				-o $(ARTIFACTS_CONTAINER_DIR)/$$BUILD_ID/dt/system-top.dts.tmp \
+				$(ARTIFACTS_CONTAINER_DIR)/$$BUILD_ID/dt/system-top.dts && \
+			dtc -I dts -O dtb \
+				-o $(ARTIFACTS_CONTAINER_DIR)/$$BUILD_ID/dt/system-top.dtb \
+				$(ARTIFACTS_CONTAINER_DIR)/$$BUILD_ID/dt/system-top.dts.tmp && \
+			ls $(ARTIFACTS_CONTAINER_DIR)/$$BUILD_ID/dt \
+		' || exit 1
+
+	echo "$$BUILD_ID" > $(LATEST_DT_FILE)
