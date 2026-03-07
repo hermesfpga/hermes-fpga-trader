@@ -1,0 +1,17 @@
+name: "Generate KRIA Zynq FPGA bitstream"
+
+on:
+  push:
+
+jobs:
+  build:
+    runs-on: [ self-hosted, Linux, wsl ]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ssh-key: ${{ secrets.build_key }}
+
+      - name: Generate bitstrem
+        run: cd scripts && make build
