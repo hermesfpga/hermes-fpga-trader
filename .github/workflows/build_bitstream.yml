@@ -15,12 +15,14 @@ jobs:
           ssh-key: ${{ secrets.build_key }}
 
       - name: Clean workspace
-        run: git clean -fdx
+        run: |
+          git -C "$GITHUB_WORKSPACE" reset --hard
+          git -C "$GITHUB_WORKSPACE" clean -ffdx
 
       - name: Generate bitstream
         run: |
           cd scripts
-          make build
+          make build_bitstream
 
       - name: Generate device tree
         run: |

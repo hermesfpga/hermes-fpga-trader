@@ -45,8 +45,22 @@ LATEST_BUILD_FILE = $(ARTIFACTS_HOST_DIR)/$(PROJECT_NAME)_latest_build.txt
 # File storing the most recent successful device tree folder
 LATEST_DT_FILE = $(ARTIFACTS_HOST_DIR)/$(PROJECT_NAME)_latest_devicetree.txt
 
+# Yocto build settings
+DOCKER_IMAGE_YOCTO_NAME = yocto_builder
+DOCKER_IMAGE_YOCTO_TAG  = v1
+DOCKER_IMAGE_YOCTO      = $(DOCKER_IMAGE_YOCTO_NAME):$(DOCKER_IMAGE_YOCTO_TAG)
 
-build:
+YOCTO_CACHE_HOST_DIR     = /home/buildserver/yocto_cache
+YOCTO_DOWNLOADS_HOST_DIR = $(YOCTO_CACHE_HOST_DIR)/downloads
+YOCTO_SSTATE_HOST_DIR    = $(YOCTO_CACHE_HOST_DIR)/sstate
+
+YOCTO_DOWNLOADS_DIR = /yocto-downloads
+YOCTO_SSTATE_DIR    = /yocto-sstate
+
+YOCTO_MACHINE = k26-smk-kr-sdt
+YOCTO_IMAGE   = kria-image-full-cmdline
+
+build_bitstream:
 	mkdir -p $(BUILD_DIR)
 
 	# run Vivado inside container and capture output; logs are always written
@@ -86,12 +100,6 @@ report:
 	if [ -f "$$LOG" ]; then \
 		STATUS=$$(cat $$STATUS_FILE 2>/dev/null || echo "1"); \
 		{ \
-			if [ "$$STATUS" = "0" ]; then \
-				echo "Status: ✅ Build successful"; \
-			else \
-				echo "Status: ❌ Build failed"; \
-			fi; \
-			echo ""; \
 			echo "### Summary"; \
 			echo ""; \
 			grep "Failing Nets\|Worst Negative Slack" "$$LOG" || echo "(no summary found)"; \
@@ -137,3 +145,15 @@ devicetree:
 		' || exit 1
 
 	echo "$$BUILD_PATH" > $(LATEST_DT_FILE)
+
+build_yocto:
+	docker run --rm \
+		-e LOCAL_UID=$$(id -u) \
+		-e LOCAL_GID=$$(id -g) \
+		-v $(YOCTO_DOWNLOADS_HOST_DIR):$(YOCTO_DOWNLOADS_DIR) \
+		-v $(YOCTO_SSTATE_HOST_DIR):$(YOCTO_SSTATE_DIR) \
+		$(DOCKER_IMAGE_YOCTO) \
+		bash -lc ' \
+			sed -i -e "/^MACHINE\s*=.*/d" -e "$$a MACHINE = \"$(YOCTO_MACHINE)\"" conf/local.conf && \
+			bitbake $(YOCTO_IMAGE) \
+		'

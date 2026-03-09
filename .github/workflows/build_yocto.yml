@@ -1,0 +1,28 @@
+name: "Build KRIA Yocto image"
+
+on:
+  workflow_run:
+    workflows: ["Generate KRIA Zynq FPGA bitstream"]
+    types:
+      - completed
+  workflow_dispatch:
+
+jobs:
+  build_yocto:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: [ self-hosted, Linux, wsl ]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ssh-key: ${{ secrets.build_key }}
+
+      - name: Clean workspace
+        run: git clean -fdx
+
+      - name: Build Yocto image
+        run: |
+          cd scripts
+          make build_yocto
