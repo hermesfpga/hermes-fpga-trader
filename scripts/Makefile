@@ -15,7 +15,7 @@ ARTIFACTS_CONTAINER_DIR = /artifacts
 DOCKER_IMAGE_VIVADO_NAME = vivado
 DOCKER_IMAGE_VIVADO_TAG  = 2025.2
 
-DOCKER_IMAGE = ${DOCKER_IMAGE_VIVADO_NAME}:${DOCKER_IMAGE_VIVADO_TAG}
+DOCKER_IMAGE_VIVADO = ${DOCKER_IMAGE_VIVADO_NAME}:${DOCKER_IMAGE_VIVADO_TAG}
 
 PROJECT_PATH = $(realpath ../)
 
@@ -73,7 +73,7 @@ build_bitstream:
 		-v ${PROJECT_PATH}:/workspace:rw \
 		-v $(ARTIFACTS_HOST_DIR):$(ARTIFACTS_CONTAINER_DIR):rw \
 		-w /workspace \
-		$(DOCKER_IMAGE) \
+		$(DOCKER_IMAGE_VIVADO) \
 		bash -lc ' \
 			vivado -mode batch -notrace -source ./scripts/create_project_and_gen_bitstream.tcl \
 				2>&1 | tee $(ARTIFACTS_CONTAINER_DIR)/$(PROJECT_NAME)/$(GIT_BRANCH_SAFE)/$(BUILD_TIMESTAMP)_$(GIT_COMMIT)/vivado.log ; \
@@ -131,7 +131,7 @@ devicetree:
 		-v ${PROJECT_PATH}:/workspace:rw \
 		-v $(ARTIFACTS_HOST_DIR):$(ARTIFACTS_CONTAINER_DIR):rw \
 		-w /workspace \
-		$(DOCKER_IMAGE) \
+		$(DOCKER_IMAGE_VIVADO) \
 		bash -lc ' \
 			BUILD_PATH='"$$BUILD_PATH"' && \
 			xsct -eval "sdtgen set_dt_param -xsa $(ARTIFACTS_CONTAINER_DIR)/$$BUILD_PATH/$(XSA_FILE) -dir $(ARTIFACTS_CONTAINER_DIR)/$$BUILD_PATH/dt; sdtgen generate_sdt; exit" && \
@@ -156,4 +156,16 @@ build_yocto:
 		bash -lc ' \
 			sed -i -e "/^MACHINE\s*=.*/d" -e "$$a MACHINE = \"$(YOCTO_MACHINE)\"" conf/local.conf && \
 			bitbake $(YOCTO_IMAGE) \
+		'
+
+build_yocto:
+	docker run --rm \
+		-e LOCAL_UID=$$(id -u) \
+		-e LOCAL_GID=$$(id -g) \
+		-v /home/buildserver/yocto_cache/downloads:/yocto-downloads \
+		-v /home/buildserver/yocto_cache/sstate:/yocto-sstate \
+		yocto_builder:v1 \
+		bash -lc ' \
+			echo '\''MACHINE = "k26-smk-kr-sdt"'\'' >> conf/local.conf && \
+			bitbake kria-image-full-cmdline \
 		'
