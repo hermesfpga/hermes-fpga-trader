@@ -26,3 +26,9 @@ jobs:
         run: |
           cd scripts
           make devicetree
+
+      - name: Generate error report
+        if: always()
+        run: |
+          cd scripts
+          make report
