@@ -1,6 +1,8 @@
-# Scripts
+# Scripts — Vivado Hardware Build
 
-This directory contains Tcl helpers and a Makefile used to manage the Vivado hardware build.
+This directory contains Tcl helpers and a Makefile used to manage the Vivado hardware build (bitstream and device tree generation).
+
+**Note:** Yocto/Linux image build scripts have been moved to [`yocto/scripts/`](../yocto/scripts/) to keep hardware and software builds cleanly separated.
 
 ## Available Tcl scripts
 
@@ -33,12 +35,12 @@ it directly from here:
 
 ```sh
 cd scripts
-make build            # full hardware build, copies artifacts to the host
+make build_bitstream  # full hardware build, copies artifacts to the host
 make devicetree       # generate DTB from latest build artifacts
-``` 
+```
 
 The Makefile also defines `PROJECT_NAME`, `ARTIFACTS_HOST_DIR`, and other
-variables that control where outputs end up.  See the file header for
+variables that control where outputs end up. See the file header for
 additional details if you need to customize the build process.
 
 ## Logging & error reporting
@@ -48,19 +50,21 @@ CI workflows it's helpful to capture this output and produce a concise
 report of any errors or warnings so they're visible on the Actions tab.
 
 The `Makefile` build target wraps Vivado in a container and pipes its
-output through `tee` into `vivado.log`.  That log (plus any generated
-`.xsa`/`.bit` files) is placed under the build directory:
+output through `tee` into `vivado.log`. That log (plus generated
+`.xsa`/`.bit` files) is placed under a shared build directory:
 
 ```
 artifacts/
 ├── kria_zynq/
 │   ├── main/
 │   │   ├── 20250309_120000_abc123/
-│   │   │   ├── vivado.log
-│   │   │   ├── vivado-report.txt
-│   │   │   ├── kria_zynq.xsa
-│   │   │   ├── kria_zynq.bit
-│   │   │   └── dt/
+│   │   │   ├── vivado/
+│   │   │   │   ├── vivado.log
+│   │   │   │   ├── vivado-report.txt
+│   │   │   │   ├── kria_zynq.xsa
+│   │   │   │   └── kria_zynq.bit
+│   │   │   ├── dt/
+│   │   │   └── yocto/
 │   │   └── 20250309_130000_def456/
 │   │       └── ...
 │   └── feature_xyz/
@@ -69,7 +73,7 @@ artifacts/
 
 A new helper target, `report`, inspects the latest log (or a specific
 `BUILD_ID`) and writes any `ERROR:`/`CRITICAL WARNING` lines to
-`vivado-report.txt`.  When run under GitHub Actions the same rule will
+`vivado-report.txt`. When run under GitHub Actions the same rule will
 also append a short summary of the report to `$GITHUB_STEP_SUMMARY` so
 the problems appear directly in the step output.
 
@@ -77,49 +81,13 @@ the problems appear directly in the step output.
 
 ```sh
 # full build + immediate report (CI can split these into separate steps)
-make build || true
+make build_bitstream || true
 make report
 ```
 
 ```sh
 # inspect a previous build explicitly
-make report BUILD_ID=20250309_120000
-```
-
-No special environment is required; the first command just runs the
-standard build, and the second produces the human‑readable report.
-
-*Tip:* upload `vivado-report.txt` as a workflow artifact if you want to
-keep the full details around for later troubleshooting.
-
-## Logging & error reporting
-
-When Vivado runs in batch mode the text output is printed to stdout. In
-CI workflows it’s helpful to capture this output and produce a concise
-report of any errors or warnings so they’re visible on the Actions tab.
-
-The `Makefile` build target wraps Vivado in a container and pipes its
-output through `tee` into `vivado.log`.  That log (plus any generated
-`.xsa`/`.bit` files) is placed under the build-ID directory and is
-always produced, even if Vivado fails.
-
-A new helper target, `report`, inspects the latest log (or a specific
-`BUILD_ID`) and writes any `ERROR:`/`CRITICAL WARNING` lines to
-`vivado-report.txt`.  When run under GitHub Actions the same rule will
-also append a short summary of the report to `$GITHUB_STEP_SUMMARY` so
-the problems appear directly in the step output.
-
-### Usage examples
-
-```sh
-# full build + immediate report (CI can split these into separate steps)
-make build || true
-make report
-```
-
-```sh
-# inspect a previous build explicitly
-make report BUILD_ID=kria_zynq_20250301_123000_main_abcd123
+make report BUILD_ID=kria_zynq/main/20250309_120000_abc123/vivado
 ```
 
 No special environment is required; the first command just runs the

@@ -37,7 +37,16 @@ BUILD_TIMESTAMP := $(shell date +%Y%m%d_%H%M%S)
 BUILD_ID := $(BUILD_TIMESTAMP)
 
 # Build directory path
-BUILD_DIR := $(ARTIFACTS_HOST_DIR)/$(PROJECT_NAME)/$(GIT_BRANCH_SAFE)/$(BUILD_TIMESTAMP)_$(GIT_COMMIT)
+BASE_DIR := $(PROJECT_NAME)/$(GIT_BRANCH_SAFE)/$(BUILD_TIMESTAMP)_$(GIT_COMMIT)
+BUILD_DIR := $(ARTIFACTS_HOST_DIR)/$(BASE_DIR)
+VIVADO_DIR := $(BUILD_DIR)/vivado
+DT_DIR := $(BUILD_DIR)/dt
+YOCTO_DIR := $(BUILD_DIR)/yocto
+
+# Relative paths for latest files
+VIVADO_REL := $(BASE_DIR)/vivado
+DT_REL := $(BASE_DIR)/dt
+YOCTO_REL := $(BASE_DIR)/yocto
 
 # File storing the most recent successful hardware build folder
 LATEST_BUILD_FILE = $(ARTIFACTS_HOST_DIR)/$(PROJECT_NAME)_latest_build.txt
@@ -45,23 +54,8 @@ LATEST_BUILD_FILE = $(ARTIFACTS_HOST_DIR)/$(PROJECT_NAME)_latest_build.txt
 # File storing the most recent successful device tree folder
 LATEST_DT_FILE = $(ARTIFACTS_HOST_DIR)/$(PROJECT_NAME)_latest_devicetree.txt
 
-# Yocto build settings
-DOCKER_IMAGE_YOCTO_NAME = yocto_builder
-DOCKER_IMAGE_YOCTO_TAG  = v1
-DOCKER_IMAGE_YOCTO      = $(DOCKER_IMAGE_YOCTO_NAME):$(DOCKER_IMAGE_YOCTO_TAG)
-
-YOCTO_CACHE_HOST_DIR     = /home/buildserver/yocto_cache
-YOCTO_DOWNLOADS_HOST_DIR = $(YOCTO_CACHE_HOST_DIR)/downloads
-YOCTO_SSTATE_HOST_DIR    = $(YOCTO_CACHE_HOST_DIR)/sstate
-
-YOCTO_DOWNLOADS_DIR = /yocto-downloads
-YOCTO_SSTATE_DIR    = /yocto-sstate
-
-YOCTO_MACHINE = k26-smk-kr-sdt
-YOCTO_IMAGE   = kria-image-full-cmdline
-
 build_bitstream:
-	mkdir -p $(BUILD_DIR)
+	mkdir -p $(VIVADO_DIR)
 
 	# run Vivado inside container and capture output; logs are always written
 	# to the artifacts directory so `make report` can consume them later.
@@ -76,15 +70,15 @@ build_bitstream:
 		$(DOCKER_IMAGE_VIVADO) \
 		bash -lc ' \
 			vivado -mode batch -notrace -source ./scripts/create_project_and_gen_bitstream.tcl \
-				2>&1 | tee $(ARTIFACTS_CONTAINER_DIR)/$(PROJECT_NAME)/$(GIT_BRANCH_SAFE)/$(BUILD_TIMESTAMP)_$(GIT_COMMIT)/vivado.log ; \
-			cp $(VIVADO_EXPORT_DIR)/$(XSA_FILE) $(ARTIFACTS_CONTAINER_DIR)/$(PROJECT_NAME)/$(GIT_BRANCH_SAFE)/$(BUILD_TIMESTAMP)_$(GIT_COMMIT)/$(XSA_FILE) && \
-			cp $(VIVADO_EXPORT_DIR)/$(BIT_FILE) $(ARTIFACTS_CONTAINER_DIR)/$(PROJECT_NAME)/$(GIT_BRANCH_SAFE)/$(BUILD_TIMESTAMP)_$(GIT_COMMIT)/$(BIT_FILE) && \
-			ls -l $(ARTIFACTS_CONTAINER_DIR)/$(PROJECT_NAME)/$(GIT_BRANCH_SAFE)/$(BUILD_TIMESTAMP)_$(GIT_COMMIT) \
+				2>&1 | tee $(ARTIFACTS_CONTAINER_DIR)/$(VIVADO_REL)/vivado.log ; \
+			cp $(VIVADO_EXPORT_DIR)/$(XSA_FILE) $(ARTIFACTS_CONTAINER_DIR)/$(VIVADO_REL)/$(XSA_FILE) && \
+			cp $(VIVADO_EXPORT_DIR)/$(BIT_FILE) $(ARTIFACTS_CONTAINER_DIR)/$(VIVADO_REL)/$(BIT_FILE) && \
+			ls -l $(ARTIFACTS_CONTAINER_DIR)/$(VIVADO_REL) \
 		' ; \
-	echo $$? > $(BUILD_DIR)/vivado-status.txt
+	echo $$? > $(VIVADO_DIR)/vivado-status.txt
 
 	# record the build ID even if Vivado failed
-	echo "$(PROJECT_NAME)/$(GIT_BRANCH_SAFE)/$(BUILD_TIMESTAMP)_$(GIT_COMMIT)" > $(LATEST_BUILD_FILE)
+	printf '%s' "$(VIVADO_REL)" > $(LATEST_BUILD_FILE)
 
 	# allow the build to fail but still run report from CI with `make report`
 
@@ -100,7 +94,7 @@ report:
 	if [ -f "$$LOG" ]; then \
 		STATUS=$$(cat $$STATUS_FILE 2>/dev/null || echo "1"); \
 		{ \
-			echo "### Summary"; \
+			echo "### Vivado run summary"; \
 			echo ""; \
 			grep "Failing Nets\|Worst Negative Slack" "$$LOG" || echo "(no summary found)"; \
 			echo ""; \
@@ -122,7 +116,8 @@ report:
 devicetree:
 	test -f $(LATEST_BUILD_FILE)
 	BUILD_PATH="$$(cat $(LATEST_BUILD_FILE))"
-	mkdir -p $(ARTIFACTS_HOST_DIR)/$$BUILD_PATH/dt
+	DT_BUILD_PATH=$$(dirname "$$BUILD_PATH")/dt
+	mkdir -p $(ARTIFACTS_HOST_DIR)/$$DT_BUILD_PATH
 
 	docker run --network bridge \
 		--rm \
@@ -134,38 +129,16 @@ devicetree:
 		$(DOCKER_IMAGE_VIVADO) \
 		bash -lc ' \
 			BUILD_PATH='"$$BUILD_PATH"' && \
-			xsct -eval "sdtgen set_dt_param -xsa $(ARTIFACTS_CONTAINER_DIR)/$$BUILD_PATH/$(XSA_FILE) -dir $(ARTIFACTS_CONTAINER_DIR)/$$BUILD_PATH/dt; sdtgen generate_sdt; exit" && \
-			gcc -I $(ARTIFACTS_CONTAINER_DIR)/$$BUILD_PATH/dt -E -nostdinc -undef -D__DTS__ -x assembler-with-cpp \
-				-o $(ARTIFACTS_CONTAINER_DIR)/$$BUILD_PATH/dt/system-top.dts.tmp \
-				$(ARTIFACTS_CONTAINER_DIR)/$$BUILD_PATH/dt/system-top.dts && \
+			DT_BUILD_PATH='"$$DT_BUILD_PATH"' && \
+			xsct -eval "sdtgen set_dt_param -xsa $(ARTIFACTS_CONTAINER_DIR)/$$BUILD_PATH/$(XSA_FILE) -dir $(ARTIFACTS_CONTAINER_DIR)/$$DT_BUILD_PATH; sdtgen generate_sdt; exit" && \
+			gcc -I $(ARTIFACTS_CONTAINER_DIR)/$$DT_BUILD_PATH -E -nostdinc -undef -D__DTS__ -x assembler-with-cpp \
+				-o $(ARTIFACTS_CONTAINER_DIR)/$$DT_BUILD_PATH/system-top.dts.tmp \
+				$(ARTIFACTS_CONTAINER_DIR)/$$DT_BUILD_PATH/system-top.dts && \
 			dtc -I dts -O dtb \
-				-o $(ARTIFACTS_CONTAINER_DIR)/$$BUILD_PATH/dt/system-top.dtb \
-				$(ARTIFACTS_CONTAINER_DIR)/$$BUILD_PATH/dt/system-top.dts.tmp && \
-			ls $(ARTIFACTS_CONTAINER_DIR)/$$BUILD_PATH/dt \
+				-o $(ARTIFACTS_CONTAINER_DIR)/$$DT_BUILD_PATH/system-top.dtb \
+				$(ARTIFACTS_CONTAINER_DIR)/$$DT_BUILD_PATH/system-top.dts.tmp && \
+			ls $(ARTIFACTS_CONTAINER_DIR)/$$DT_BUILD_PATH \
 		' || exit 1
 
-	echo "$$BUILD_PATH" > $(LATEST_DT_FILE)
-
-build_yocto:
-	docker run --rm \
-		-e LOCAL_UID=$$(id -u) \
-		-e LOCAL_GID=$$(id -g) \
-		-v $(YOCTO_DOWNLOADS_HOST_DIR):$(YOCTO_DOWNLOADS_DIR) \
-		-v $(YOCTO_SSTATE_HOST_DIR):$(YOCTO_SSTATE_DIR) \
-		$(DOCKER_IMAGE_YOCTO) \
-		bash -lc ' \
-			sed -i -e "/^MACHINE\s*=.*/d" -e "$$a MACHINE = \"$(YOCTO_MACHINE)\"" conf/local.conf && \
-			bitbake $(YOCTO_IMAGE) \
-		'
-
-build_yocto:
-	docker run --rm \
-		-e LOCAL_UID=$$(id -u) \
-		-e LOCAL_GID=$$(id -g) \
-		-v /home/buildserver/yocto_cache/downloads:/yocto-downloads \
-		-v /home/buildserver/yocto_cache/sstate:/yocto-sstate \
-		yocto_builder:v1 \
-		bash -lc ' \
-			echo '\''MACHINE = "k26-smk-kr-sdt"'\'' >> conf/local.conf && \
-			bitbake kria-image-full-cmdline \
-		'
+	# record the build ID
+	printf '%s' "$$DT_BUILD_PATH" > $(LATEST_DT_FILE)

@@ -29,8 +29,19 @@ jobs:
           cd scripts
           make devicetree
 
-      - name: Generate error report
+      - name: Build Yocto image
+        run: |
+          cd yocto/scripts
+          make build_yocto
+
+      - name: Generate Vivado error report
         if: always()
         run: |
           cd scripts
+          make report
+
+      - name: Generate Yocto error report
+        if: always()
+        run: |
+          cd yocto/scripts
           make report
