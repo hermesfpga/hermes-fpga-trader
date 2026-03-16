@@ -43,11 +43,16 @@ else
 fi
 
 # Validate and stage external DTS/DTB artifacts before image build.
-bitbake hermes-external-dtb
+YOCTO_LOG="${ARTIFACTS_CONTAINER_DIR}/${YOCTO_BUILD_PATH}/yocto.log"
+set -o pipefail
+bitbake hermes-external-dtb 2>&1 | tee -a "${YOCTO_LOG}"
+EXT_DT_EXIT=${PIPESTATUS[0]}
+if [ ${EXT_DT_EXIT} -ne 0 ]; then
+    exit ${EXT_DT_EXIT}
+fi
 
 # Build image and keep the real bitbake exit code even with tee enabled.
-set -o pipefail
-bitbake "${YOCTO_IMAGE}" 2>&1 | tee -a "${ARTIFACTS_CONTAINER_DIR}/${YOCTO_BUILD_PATH}/yocto.log"
+bitbake "${YOCTO_IMAGE}" 2>&1 | tee -a "${YOCTO_LOG}"
 BB_EXIT=${PIPESTATUS[0]}
 
 # Resolve Yocto deploy output and export boot artifacts to persistent host storage.
