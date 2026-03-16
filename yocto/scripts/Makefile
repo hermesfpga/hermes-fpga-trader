@@ -32,6 +32,7 @@ YOCTO_SSTATE_DIR    = /yocto-sstate
 
 YOCTO_MACHINE = hermes-k26
 YOCTO_IMAGE   = kria-image-full-cmdline
+YOCTO_DTS_NAME ?= system-top.dts
 YOCTO_DTB_NAME ?= system-top.dtb
 
 # File storing the most recent successful device tree folder
@@ -62,6 +63,7 @@ build_yocto:
 		-e LOCAL_GID=$$(id -g) \
 		-e YOCTO_IMAGE="$(YOCTO_IMAGE)" \
 		-e YOCTO_MACHINE="$(YOCTO_MACHINE)" \
+		-e YOCTO_DTS_NAME="$(YOCTO_DTS_NAME)" \
 		-e YOCTO_DTB_NAME="$(YOCTO_DTB_NAME)" \
 		-e LAYER_CONTAINER_PATH="$(LAYER_CONTAINER_PATH)" \
 		-e ARTIFACTS_CONTAINER_DIR="$(ARTIFACTS_CONTAINER_DIR)" \

@@ -8,6 +8,7 @@ if [ -z "${YOCTO_IMAGE:-}" ] || [ -z "${YOCTO_MACHINE:-}" ] || [ -z "${YOCTO_BUI
 fi
 
 YOCTO_DTB_NAME="${YOCTO_DTB_NAME:-system-top.dtb}"
+YOCTO_DTS_NAME="${YOCTO_DTS_NAME:-system-top.dts}"
 
 # Confirm the mounted DT artifacts are visible inside the container.
 echo "Mounted device tree files:"
@@ -29,8 +30,19 @@ else
     echo "HERMES_EXTERNAL_DTB = \"${YOCTO_DTB_NAME}\"" >> conf/local.conf
 fi
 
-# Build the external DTB deploy artifact first so boot components consume it
-# from DEPLOY_DIR_IMAGE during the same run.
+if grep -Eq '^HERMES_EXTERNAL_DTS[[:space:]]*=' conf/local.conf; then
+    sed -i -E "s|^HERMES_EXTERNAL_DTS[[:space:]]*=.*$|HERMES_EXTERNAL_DTS = \"${YOCTO_DTS_NAME}\"|" conf/local.conf
+else
+    echo "HERMES_EXTERNAL_DTS = \"${YOCTO_DTS_NAME}\"" >> conf/local.conf
+fi
+
+if grep -Eq '^SYSTEM_DTFILE[[:space:]]*=' conf/local.conf; then
+    sed -i -E "s|^SYSTEM_DTFILE[[:space:]]*=.*$|SYSTEM_DTFILE = \"/dt/${YOCTO_DTS_NAME}\"|" conf/local.conf
+else
+    echo "SYSTEM_DTFILE = \"/dt/${YOCTO_DTS_NAME}\"" >> conf/local.conf
+fi
+
+# Validate and stage external DTS/DTB artifacts before image build.
 bitbake hermes-external-dtb
 
 # Build image and keep the real bitbake exit code even with tee enabled.

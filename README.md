@@ -38,11 +38,13 @@ Outputs are grouped per build under one timestamp+commit directory:
 
 ### 2. Linux Image Build (Yocto)
 
-Builds a complete Linux image with your custom bitstream and device tree embedded:
+Builds a complete Linux image with your custom bitstream and SDT-integrated device tree:
 
 ```sh
 cd yocto/scripts
 make build_yocto         # Bitbake image (mounts DT artifacts, installs them)
+# optional per-run DT names:
+# make build_yocto YOCTO_DTS_NAME=system-top.dts YOCTO_DTB_NAME=system-top.dtb
 ```
 
 Yocto logs and reports for that same build are written to:
