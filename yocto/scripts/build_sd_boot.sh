@@ -7,6 +7,9 @@ if [ -z "${YOCTO_IMAGE:-}" ] || [ -z "${YOCTO_MACHINE:-}" ] || [ -z "${YOCTO_BUI
     exit 2
 fi
 
+YOCTO_DTB_NAME="${YOCTO_DTB_NAME:-system-top.dtb}"
+YOCTO_DTS_NAME="${YOCTO_DTS_NAME:-system-top.dts}"
+
 # Confirm the mounted DT artifacts are visible inside the container.
 echo "Mounted device tree files:"
 ls /dt
@@ -14,11 +17,42 @@ ls /dt
 # Ensure the custom layer and required image config are present.
 bitbake-layers add-layer "${LAYER_CONTAINER_PATH}" 2>/dev/null || true
 grep -q '^IMAGE_INSTALL:append.*kria-artifacts' conf/local.conf || echo 'IMAGE_INSTALL:append = " kria-artifacts"' >> conf/local.conf
-grep -Eq '^MACHINE[[:space:]]*=[[:space:]]*"' conf/local.conf || echo "MACHINE = \"${YOCTO_MACHINE}\"" >> conf/local.conf
+
+if grep -Eq '^MACHINE[[:space:]]*=' conf/local.conf; then
+    sed -i -E "s|^MACHINE[[:space:]]*=.*$|MACHINE = \"${YOCTO_MACHINE}\"|" conf/local.conf
+else
+    echo "MACHINE = \"${YOCTO_MACHINE}\"" >> conf/local.conf
+fi
+
+if grep -Eq '^HERMES_EXTERNAL_DTB[[:space:]]*=' conf/local.conf; then
+    sed -i -E "s|^HERMES_EXTERNAL_DTB[[:space:]]*=.*$|HERMES_EXTERNAL_DTB = \"${YOCTO_DTB_NAME}\"|" conf/local.conf
+else
+    echo "HERMES_EXTERNAL_DTB = \"${YOCTO_DTB_NAME}\"" >> conf/local.conf
+fi
+
+if grep -Eq '^HERMES_EXTERNAL_DTS[[:space:]]*=' conf/local.conf; then
+    sed -i -E "s|^HERMES_EXTERNAL_DTS[[:space:]]*=.*$|HERMES_EXTERNAL_DTS = \"${YOCTO_DTS_NAME}\"|" conf/local.conf
+else
+    echo "HERMES_EXTERNAL_DTS = \"${YOCTO_DTS_NAME}\"" >> conf/local.conf
+fi
+
+if grep -Eq '^SYSTEM_DTFILE[[:space:]]*=' conf/local.conf; then
+    sed -i -E "s|^SYSTEM_DTFILE[[:space:]]*=.*$|SYSTEM_DTFILE = \"/dt/${YOCTO_DTS_NAME}\"|" conf/local.conf
+else
+    echo "SYSTEM_DTFILE = \"/dt/${YOCTO_DTS_NAME}\"" >> conf/local.conf
+fi
+
+# Validate and stage external DTS/DTB artifacts before image build.
+YOCTO_LOG="${ARTIFACTS_CONTAINER_DIR}/${YOCTO_BUILD_PATH}/yocto.log"
+set -o pipefail
+bitbake hermes-external-dtb 2>&1 | tee -a "${YOCTO_LOG}"
+EXT_DT_EXIT=${PIPESTATUS[0]}
+if [ ${EXT_DT_EXIT} -ne 0 ]; then
+    exit ${EXT_DT_EXIT}
+fi
 
 # Build image and keep the real bitbake exit code even with tee enabled.
-set -o pipefail
-bitbake "${YOCTO_IMAGE}" 2>&1 | tee -a "${ARTIFACTS_CONTAINER_DIR}/${YOCTO_BUILD_PATH}/yocto.log"
+bitbake "${YOCTO_IMAGE}" 2>&1 | tee -a "${YOCTO_LOG}"
 BB_EXIT=${PIPESTATUS[0]}
 
 # Resolve Yocto deploy output and export boot artifacts to persistent host storage.

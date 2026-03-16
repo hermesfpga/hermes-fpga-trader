@@ -10,6 +10,8 @@ yocto/
 ├── scripts/build_sd_boot.sh                  # in-container Yocto build/export logic
 └── meta-custom-bitstream/                    # Reusable Yocto layer
     ├── conf/layer.conf
+    ├── conf/machine/hermes-k26.conf
+    ├── recipes-bsp/device-tree/hermes-external-dtb.bb
     └── recipes-bsp/kria-artifacts/kria-artifacts.bb
 ```
 
@@ -21,6 +23,9 @@ cd scripts && make build_bitstream && make devicetree
 
 # Yocto build consumes those artifacts
 cd yocto/scripts && make build_yocto
+
+# Optional per-run overrides
+# make build_yocto YOCTO_DTS_NAME=system-top.dts YOCTO_DTB_NAME=system-top.dtb
 ```
 
 Current artifact layout for one build:
@@ -37,9 +42,11 @@ Path tracker files:
 - `/home/buildserver/artifacts/kria_zynq_latest_devicetree.txt` -> `.../dt`
 - `/home/buildserver/artifacts/kria_zynq_latest_yocto_build.txt` -> `.../yocto`
 
-The `build_yocto` target mounts the device tree directory and installs files into the image:
-- Bitstream → `/lib/firmware/`
-- Device tree → `/boot/dtbs/`
+The `build_yocto` target mounts the device tree directory and uses it in two ways:
+- Build-time DTS source (`SYSTEM_DTFILE`) → `/dt/<name>.dts` (defaults to `system-top.dts`)
+- Packaged runtime artifacts:
+    - Bitstream → `/lib/firmware/`
+    - DTB copy → `/boot/dtbs/`
 
 The Yocto `report` target reads `yocto.log` from that `yocto/` folder and generates `yocto-report.txt`.
 
@@ -68,11 +75,20 @@ Include in your image:
 IMAGE_INSTALL:append = " kria-artifacts"
 ```
 
-## Kernel Integration
+Build machine and DT source integration:
 
 ```conf
-KERNEL_DEVICETREE = "system-top"
+MACHINE = "hermes-k26"
+SYSTEM_DTFILE = "/dt/system-top.dts"
 ```
+
+Per-run overrides are provided by the Yocto Makefile:
+
+```sh
+make build_yocto YOCTO_DTS_NAME=system-top.dts YOCTO_DTB_NAME=system-top.dtb
+```
+
+## Runtime Bitstream Load
 
 Load bitstream in U-Boot or init script:
 ```sh
