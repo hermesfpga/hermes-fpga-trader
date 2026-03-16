@@ -6,7 +6,5 @@ do_deploy:append() {
         bbfatal "External DTB missing in deploy dir: ${DEPLOY_DIR_IMAGE}/${HERMES_EXTERNAL_DTB}"
     fi
 
-    install -m 0644 "${DEPLOY_DIR_IMAGE}/${HERMES_EXTERNAL_DTB}" "${DEPLOYDIR}/${HERMES_EXTERNAL_DTB}"
-    ln -sf "${HERMES_EXTERNAL_DTB}" "${DEPLOYDIR}/system.dtb"
-    bbnote "U-Boot deploy now uses external DTB: ${HERMES_EXTERNAL_DTB}"
+    bbnote "External DTB ready for boot flow: ${DEPLOY_DIR_IMAGE}/${HERMES_EXTERNAL_DTB}"
 }
