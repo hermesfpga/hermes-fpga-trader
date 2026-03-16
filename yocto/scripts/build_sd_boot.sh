@@ -7,6 +7,8 @@ if [ -z "${YOCTO_IMAGE:-}" ] || [ -z "${YOCTO_MACHINE:-}" ] || [ -z "${YOCTO_BUI
     exit 2
 fi
 
+YOCTO_DTB_NAME="${YOCTO_DTB_NAME:-system-top.dtb}"
+
 # Confirm the mounted DT artifacts are visible inside the container.
 echo "Mounted device tree files:"
 ls /dt
@@ -14,7 +16,22 @@ ls /dt
 # Ensure the custom layer and required image config are present.
 bitbake-layers add-layer "${LAYER_CONTAINER_PATH}" 2>/dev/null || true
 grep -q '^IMAGE_INSTALL:append.*kria-artifacts' conf/local.conf || echo 'IMAGE_INSTALL:append = " kria-artifacts"' >> conf/local.conf
-grep -Eq '^MACHINE[[:space:]]*=[[:space:]]*"' conf/local.conf || echo "MACHINE = \"${YOCTO_MACHINE}\"" >> conf/local.conf
+
+if grep -Eq '^MACHINE[[:space:]]*=' conf/local.conf; then
+    sed -i -E "s|^MACHINE[[:space:]]*=.*$|MACHINE = \"${YOCTO_MACHINE}\"|" conf/local.conf
+else
+    echo "MACHINE = \"${YOCTO_MACHINE}\"" >> conf/local.conf
+fi
+
+if grep -Eq '^HERMES_EXTERNAL_DTB[[:space:]]*=' conf/local.conf; then
+    sed -i -E "s|^HERMES_EXTERNAL_DTB[[:space:]]*=.*$|HERMES_EXTERNAL_DTB = \"${YOCTO_DTB_NAME}\"|" conf/local.conf
+else
+    echo "HERMES_EXTERNAL_DTB = \"${YOCTO_DTB_NAME}\"" >> conf/local.conf
+fi
+
+# Build the external DTB deploy artifact first so boot components consume it
+# from DEPLOY_DIR_IMAGE during the same run.
+bitbake hermes-external-dtb
 
 # Build image and keep the real bitbake exit code even with tee enabled.
 set -o pipefail
