@@ -64,15 +64,15 @@ if [ -d "${DEPLOY_DIR}" ]; then
     echo "Exporting Yocto .wic.xz image from ${DEPLOY_DIR} to ${OUT_BOOT_DIR}"
     # DEPLOY_DIR_IMAGE typically resolves to:
     # /workspace/build/tmp/deploy/images/<machine>
-    # and contains files like <image>-<machine>-<timestamp>.wic.xz
-    MATCHED=$(find "${DEPLOY_DIR}" -maxdepth 1 \( -type f -o -type l \) -name "*.wic.xz" | wc -l)
+    # Copy only the actual timestamped .wic.xz file, not the convenience symlink
+    WIC_FILE=$(find "${DEPLOY_DIR}" -maxdepth 1 -type f -name "*.wic.xz" | head -1)
 
-    if [ "${MATCHED}" -eq 0 ]; then
+    if [ -z "$WIC_FILE" ]; then
         echo "WARNING: No .wic.xz file found in ${DEPLOY_DIR}" >&2
         echo "Top-level deploy contents:" >&2
         ls -lah "${DEPLOY_DIR}" >&2 || true
     else
-        find "${DEPLOY_DIR}" -maxdepth 1 \( -type f -o -type l \) -name "*.wic.xz" -exec cp -avL {} "${OUT_BOOT_DIR}/" \;
+        cp -av "$WIC_FILE" "${OUT_BOOT_DIR}/"
     fi
 
     ls -lah "${OUT_BOOT_DIR}"
