@@ -471,7 +471,7 @@ Port;FD4A0000;FD4AFFFF;1|FPD;DPDMA;FD4C0000;FD4CFFFF;1|FPD;DDR_XMPU5_CFG;FD05000
   # Create instance: smartconnect_0, and set properties
   set smartconnect_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:smartconnect:1.0 smartconnect_0 ]
   set_property -dict [list \
-    CONFIG.NUM_CLKS {2} \
+    CONFIG.NUM_CLKS {1} \
     CONFIG.NUM_MI {2} \
     CONFIG.NUM_SI {1} \
   ] $smartconnect_0
@@ -496,8 +496,9 @@ Port;FD4A0000;FD4AFFFF;1|FPD;DPDMA;FD4C0000;FD4CFFFF;1|FPD;DDR_XMPU5_CFG;FD05000
   connect_bd_net -net clk_wiz_0_clk_out1  [get_bd_pins clk_wiz_0/pl_clk] \
   [get_bd_pins pl_reset/slowest_sync_clk] \
   [get_bd_pins axi_timer_0/s_axi_aclk] \
-  [get_bd_pins smartconnect_0/aclk1] \
-  [get_bd_pins axi_intc_0/s_axi_aclk]
+  [get_bd_pins axi_intc_0/s_axi_aclk] \
+  [get_bd_pins zynq_ultra_ps_e_0/maxihpm0_lpd_aclk] \
+  [get_bd_pins smartconnect_0/aclk]
   connect_bd_net -net clk_wiz_0_locked  [get_bd_pins clk_wiz_0/locked] \
   [get_bd_pins pl_reset/dcm_locked]
   connect_bd_net -net pl_reset_interconnect_aresetn  [get_bd_pins pl_reset/interconnect_aresetn] \
@@ -506,9 +507,7 @@ Port;FD4A0000;FD4AFFFF;1|FPD;DPDMA;FD4C0000;FD4CFFFF;1|FPD;DDR_XMPU5_CFG;FD05000
   [get_bd_pins axi_timer_0/s_axi_aresetn] \
   [get_bd_pins axi_intc_0/s_axi_aresetn]
   connect_bd_net -net zynq_ultra_ps_e_0_pl_clk0  [get_bd_pins zynq_ultra_ps_e_0/pl_clk0] \
-  [get_bd_pins clk_wiz_0/clk_in1] \
-  [get_bd_pins zynq_ultra_ps_e_0/maxihpm0_lpd_aclk] \
-  [get_bd_pins smartconnect_0/aclk]
+  [get_bd_pins clk_wiz_0/clk_in1]
   connect_bd_net -net zynq_ultra_ps_e_0_pl_resetn0  [get_bd_pins zynq_ultra_ps_e_0/pl_resetn0] \
   [get_bd_pins clk_wiz_0/resetn] \
   [get_bd_pins pl_reset/ext_reset_in]
