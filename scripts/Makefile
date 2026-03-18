@@ -5,6 +5,7 @@
 PROJECT_NAME = kria_zynq
 XSA_FILE = $(PROJECT_NAME).xsa
 BIT_FILE = $(PROJECT_NAME).bit
+BIN_FILE = $(PROJECT_NAME).bin
 
 # Host path where artifacts are stored
 ARTIFACTS_HOST_DIR = /home/buildserver/artifacts
@@ -73,6 +74,8 @@ build_bitstream:
 				2>&1 | tee $(ARTIFACTS_CONTAINER_DIR)/$(VIVADO_REL)/vivado.log ; \
 			cp $(VIVADO_EXPORT_DIR)/$(XSA_FILE) $(ARTIFACTS_CONTAINER_DIR)/$(VIVADO_REL)/$(XSA_FILE) && \
 			cp $(VIVADO_EXPORT_DIR)/$(BIT_FILE) $(ARTIFACTS_CONTAINER_DIR)/$(VIVADO_REL)/$(BIT_FILE) && \
+			echo 'all: { [destination_device=pl] $(ARTIFACTS_CONTAINER_DIR)/$(VIVADO_REL)/$(BIT_FILE) }' > /tmp/$(PROJECT_NAME).bif && \
+			bootgen -arch zynqmp -image /tmp/$(PROJECT_NAME).bif -process_bitstream bin -o $(ARTIFACTS_CONTAINER_DIR)/$(VIVADO_REL)/$(BIN_FILE) -w on && \
 			ls -l $(ARTIFACTS_CONTAINER_DIR)/$(VIVADO_REL) \
 		' ; \
 	echo $$? > $(VIVADO_DIR)/vivado-status.txt
@@ -137,6 +140,8 @@ devicetree:
 			dtc -I dts -O dtb \
 				-o $(ARTIFACTS_CONTAINER_DIR)/$$DT_BUILD_PATH/system-top.dtb \
 				$(ARTIFACTS_CONTAINER_DIR)/$$DT_BUILD_PATH/system-top.dts.tmp && \
+			cp $(ARTIFACTS_CONTAINER_DIR)/$$BUILD_PATH/$(BIT_FILE) $(ARTIFACTS_CONTAINER_DIR)/$$DT_BUILD_PATH/$(BIT_FILE) && \
+			cp $(ARTIFACTS_CONTAINER_DIR)/$$BUILD_PATH/$(XSA_FILE) $(ARTIFACTS_CONTAINER_DIR)/$$DT_BUILD_PATH/$(XSA_FILE) && \
 			ls $(ARTIFACTS_CONTAINER_DIR)/$$DT_BUILD_PATH \
 		' || exit 1
 
