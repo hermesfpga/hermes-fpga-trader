@@ -3,16 +3,21 @@ LICENSE = "CLOSED"
 SRC_URI = " \
     file://hermes-autoexpand-rootfs.sh \
     file://hermes-autoexpand-rootfs.service \
+    file://hermes-load-bitstream.sh \
+    file://hermes-load-bitstream.service \
 "
 
 inherit allarch systemd
 
-SYSTEMD_SERVICE:${PN} = "hermes-autoexpand-rootfs.service"
+SYSTEMD_SERVICE:${PN} = "hermes-autoexpand-rootfs.service hermes-load-bitstream.service"
 SYSTEMD_AUTO_ENABLE:${PN} = "enable"
 
 RDEPENDS:${PN} += " \
+    coreutils \
+    devmem2 \
     e2fsprogs-resize2fs \
     parted \
+    procps \
     util-linux \
 "
 
@@ -59,8 +64,12 @@ do_install () {
     install -m 0644 /dt/*.dtb ${D}/boot/dtbs/ 2>/dev/null || bbwarn "No .dtb files found in /dt"
     install -d ${D}${sbindir}
     install -m 0755 ${WORKDIR}/hermes-autoexpand-rootfs.sh ${D}${sbindir}/hermes-autoexpand-rootfs
+    install -m 0755 ${WORKDIR}/hermes-load-bitstream.sh ${D}${sbindir}/hermes-load-bitstream
     install -d ${D}${systemd_system_unitdir}
     install -m 0644 ${WORKDIR}/hermes-autoexpand-rootfs.service ${D}${systemd_system_unitdir}/
+    install -m 0644 ${WORKDIR}/hermes-load-bitstream.service ${D}${systemd_system_unitdir}/
+    install -d ${D}${sysconfdir}/hermes
+    printf '%s\n' "${SELECTED_BIT}" > ${D}${sysconfdir}/hermes/bitstream-firmware
     install -d ${D}${sysconfdir}/dfx-mgrd
     printf '%s\n' "${HERMES_DEFAULT_ACCEL}" > ${D}${sysconfdir}/dfx-mgrd/default_firmware
     bbnote "Installed files:"
@@ -72,6 +81,9 @@ FILES:${PN} += " \
     ${nonarch_base_libdir}/firmware/* \
     /boot/dtbs/* \
     ${sbindir}/hermes-autoexpand-rootfs \
+    ${sbindir}/hermes-load-bitstream \
+    ${sysconfdir}/hermes/bitstream-firmware \
     ${sysconfdir}/dfx-mgrd/default_firmware \
     ${systemd_system_unitdir}/hermes-autoexpand-rootfs.service \
+    ${systemd_system_unitdir}/hermes-load-bitstream.service \
 "
