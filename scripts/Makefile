@@ -22,6 +22,7 @@ PROJECT_PATH = $(realpath ../)
 
 # This path must follow scripts/setup_and_build_project.tcl
 VIVADO_EXPORT_DIR = vivado
+IMPL_RUN_DIR = $(VIVADO_EXPORT_DIR)/$(PROJECT_NAME)/$(PROJECT_NAME).runs/impl_1
 
 # Git information
 GIT_BRANCH_RAW  := $(shell git -C $(PROJECT_PATH) rev-parse --abbrev-ref HEAD)
@@ -74,6 +75,7 @@ build_bitstream:
 				2>&1 | tee $(ARTIFACTS_CONTAINER_DIR)/$(VIVADO_REL)/vivado.log ; \
 			cp $(VIVADO_EXPORT_DIR)/$(XSA_FILE) $(ARTIFACTS_CONTAINER_DIR)/$(VIVADO_REL)/$(XSA_FILE) && \
 			cp $(VIVADO_EXPORT_DIR)/$(BIT_FILE) $(ARTIFACTS_CONTAINER_DIR)/$(VIVADO_REL)/$(BIT_FILE) && \
+			cp $(IMPL_RUN_DIR)/*.ltx $(ARTIFACTS_CONTAINER_DIR)/$(VIVADO_REL)/ 2>/dev/null || true && \
 			echo 'all: { [destination_device=pl] $(ARTIFACTS_CONTAINER_DIR)/$(VIVADO_REL)/$(BIT_FILE) }' > /tmp/$(PROJECT_NAME).bif && \
 			bootgen -arch zynqmp -image /tmp/$(PROJECT_NAME).bif -process_bitstream bin -o $(ARTIFACTS_CONTAINER_DIR)/$(VIVADO_REL)/$(BIN_FILE) -w on && \
 			ls -l $(ARTIFACTS_CONTAINER_DIR)/$(VIVADO_REL) \
@@ -142,6 +144,7 @@ devicetree:
 				$(ARTIFACTS_CONTAINER_DIR)/$$DT_BUILD_PATH/system-top.dts.tmp && \
 			cp $(ARTIFACTS_CONTAINER_DIR)/$$BUILD_PATH/$(BIT_FILE) $(ARTIFACTS_CONTAINER_DIR)/$$DT_BUILD_PATH/$(BIT_FILE) && \
 			cp $(ARTIFACTS_CONTAINER_DIR)/$$BUILD_PATH/$(XSA_FILE) $(ARTIFACTS_CONTAINER_DIR)/$$DT_BUILD_PATH/$(XSA_FILE) && \
+			cp $(ARTIFACTS_CONTAINER_DIR)/$$BUILD_PATH/*.ltx $(ARTIFACTS_CONTAINER_DIR)/$$DT_BUILD_PATH/ 2>/dev/null || true && \
 			ls $(ARTIFACTS_CONTAINER_DIR)/$$DT_BUILD_PATH \
 		' || exit 1
 
