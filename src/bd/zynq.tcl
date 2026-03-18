@@ -135,6 +135,7 @@ xilinx.com:ip:clk_wiz:6.0\
 xilinx.com:ip:smartconnect:1.0\
 xilinx.com:ip:axi_timer:2.0\
 xilinx.com:ip:axi_intc:4.1\
+xilinx.com:ip:system_ila:1.1\
 "
 
    set list_ips_missing ""
@@ -483,10 +484,22 @@ Port;FD4A0000;FD4AFFFF;1|FPD;DPDMA;FD4C0000;FD4CFFFF;1|FPD;DDR_XMPU5_CFG;FD05000
   # Create instance: axi_intc_0, and set properties
   set axi_intc_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axi_intc:4.1 axi_intc_0 ]
 
+  # Create instance: system_ila_0, and set properties
+  set system_ila_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:system_ila:1.1 system_ila_0 ]
+  set_property -dict [list \
+    CONFIG.C_ADV_TRIGGER {true} \
+    CONFIG.C_DATA_DEPTH {2048} \
+    CONFIG.C_EN_STRG_QUAL {1} \
+    CONFIG.C_NUM_MONITOR_SLOTS {2} \
+  ] $system_ila_0
+
+
   # Create interface connections
   connect_bd_intf_net -intf_net smartconnect_0_M00_AXI [get_bd_intf_pins smartconnect_0/M00_AXI] [get_bd_intf_pins axi_timer_0/S_AXI]
+connect_bd_intf_net -intf_net [get_bd_intf_nets smartconnect_0_M00_AXI] [get_bd_intf_pins smartconnect_0/M00_AXI] [get_bd_intf_pins system_ila_0/SLOT_1_AXI]
   connect_bd_intf_net -intf_net smartconnect_0_M01_AXI [get_bd_intf_pins smartconnect_0/M01_AXI] [get_bd_intf_pins axi_intc_0/s_axi]
   connect_bd_intf_net -intf_net zynq_ultra_ps_e_0_M_AXI_HPM0_LPD [get_bd_intf_pins zynq_ultra_ps_e_0/M_AXI_HPM0_LPD] [get_bd_intf_pins smartconnect_0/S00_AXI]
+connect_bd_intf_net -intf_net [get_bd_intf_nets zynq_ultra_ps_e_0_M_AXI_HPM0_LPD] [get_bd_intf_pins zynq_ultra_ps_e_0/M_AXI_HPM0_LPD] [get_bd_intf_pins system_ila_0/SLOT_0_AXI]
 
   # Create port connections
   connect_bd_net -net axi_intc_0_irq  [get_bd_pins axi_intc_0/irq] \
@@ -498,14 +511,16 @@ Port;FD4A0000;FD4AFFFF;1|FPD;DPDMA;FD4C0000;FD4CFFFF;1|FPD;DDR_XMPU5_CFG;FD05000
   [get_bd_pins axi_timer_0/s_axi_aclk] \
   [get_bd_pins axi_intc_0/s_axi_aclk] \
   [get_bd_pins zynq_ultra_ps_e_0/maxihpm0_lpd_aclk] \
-  [get_bd_pins smartconnect_0/aclk]
+  [get_bd_pins smartconnect_0/aclk] \
+  [get_bd_pins system_ila_0/clk]
   connect_bd_net -net clk_wiz_0_locked  [get_bd_pins clk_wiz_0/locked] \
   [get_bd_pins pl_reset/dcm_locked]
   connect_bd_net -net pl_reset_interconnect_aresetn  [get_bd_pins pl_reset/interconnect_aresetn] \
   [get_bd_pins smartconnect_0/aresetn]
   connect_bd_net -net pl_reset_peripheral_aresetn  [get_bd_pins pl_reset/peripheral_aresetn] \
   [get_bd_pins axi_timer_0/s_axi_aresetn] \
-  [get_bd_pins axi_intc_0/s_axi_aresetn]
+  [get_bd_pins axi_intc_0/s_axi_aresetn] \
+  [get_bd_pins system_ila_0/resetn]
   connect_bd_net -net zynq_ultra_ps_e_0_pl_clk0  [get_bd_pins zynq_ultra_ps_e_0/pl_clk0] \
   [get_bd_pins clk_wiz_0/clk_in1]
   connect_bd_net -net zynq_ultra_ps_e_0_pl_resetn0  [get_bd_pins zynq_ultra_ps_e_0/pl_resetn0] \
