@@ -25,7 +25,7 @@ do_compile() {
     # resolve the generated includes exactly as produced by sdtgen.
     find /dt -maxdepth 1 -type f \( -name "*.dtsi" -o -name "*.yaml" \) -exec install -m 0644 {} ${B}/ \;
     if [ -d /dt/include ]; then
-        cp -a /dt/include ${B}/
+        cp -r /dt/include ${B}/
     fi
 }
 
@@ -34,7 +34,7 @@ do_install() {
     install -m 0644 "${B}/system-top.dts" "${D}${datadir}/sdt/${MACHINE}/system-top.dts"
     find ${B} -maxdepth 1 -type f \( -name "*.dtsi" -o -name "*.yaml" \) -exec install -m 0644 {} ${D}${datadir}/sdt/${MACHINE}/ \;
     if [ -d ${B}/include ]; then
-        cp -a ${B}/include ${D}${datadir}/sdt/${MACHINE}/
+        cp -r ${B}/include ${D}${datadir}/sdt/${MACHINE}/
     fi
 }
 
