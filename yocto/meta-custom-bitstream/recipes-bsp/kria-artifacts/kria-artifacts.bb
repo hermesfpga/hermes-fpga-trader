@@ -77,6 +77,12 @@ do_install () {
     find ${D}/boot/dtbs -name "*.dtb" -exec basename {} \; || true
 }
 
+pkg_postinst_ontarget:${PN} () {
+    if [ -f /boot/dtbs/system-top.dtb ]; then
+        cp /boot/dtbs/system-top.dtb /boot/system.dtb
+    fi
+}
+
 FILES:${PN} += " \
     ${nonarch_base_libdir}/firmware/* \
     /boot/dtbs/* \
