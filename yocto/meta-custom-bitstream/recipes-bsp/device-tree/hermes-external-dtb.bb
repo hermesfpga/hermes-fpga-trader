@@ -20,11 +20,22 @@ do_compile() {
     install -d ${B}
     install -m 0644 "/dt/${HERMES_EXTERNAL_DTS}" "${B}/system-top.dts"
     install -m 0644 "/dt/${HERMES_EXTERNAL_DTB}" "${B}/${HERMES_EXTERNAL_DTB}"
+
+    # Stage the full SDT companion set so Yocto's device-tree build can
+    # resolve the generated includes exactly as produced by sdtgen.
+    find /dt -maxdepth 1 -type f \( -name "*.dtsi" -o -name "*.yaml" \) -exec install -m 0644 {} ${B}/ \;
+    if [ -d /dt/include ]; then
+        cp -a /dt/include ${B}/
+    fi
 }
 
 do_install() {
     install -d ${D}${datadir}/sdt/${MACHINE}
     install -m 0644 "${B}/system-top.dts" "${D}${datadir}/sdt/${MACHINE}/system-top.dts"
+    find ${B} -maxdepth 1 -type f \( -name "*.dtsi" -o -name "*.yaml" \) -exec install -m 0644 {} ${D}${datadir}/sdt/${MACHINE}/ \;
+    if [ -d ${B}/include ]; then
+        cp -a ${B}/include ${D}${datadir}/sdt/${MACHINE}/
+    fi
 }
 
 do_deploy() {
@@ -36,4 +47,10 @@ do_deploy() {
 addtask deploy after do_compile before do_build
 
 SYSROOT_DIRS += "${datadir}/sdt"
-FILES:${PN} += "${datadir}/sdt/${MACHINE}/system-top.dts"
+FILES:${PN} += " \
+    ${datadir}/sdt/${MACHINE}/system-top.dts \
+    ${datadir}/sdt/${MACHINE}/*.dtsi \
+    ${datadir}/sdt/${MACHINE}/*.yaml \
+    ${datadir}/sdt/${MACHINE}/include \
+    ${datadir}/sdt/${MACHINE}/include/* \
+"
