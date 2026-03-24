@@ -6,6 +6,7 @@ SRC_URI = " \
     file://hermes-load-bitstream.sh \
     file://hermes-load-bitstream.service \
     file://hermes-load-overlay.sh \
+    file://pl-overlay.dts \
 "
 
 inherit allarch systemd
@@ -64,15 +65,6 @@ do_install () {
 
     install -d ${D}/boot/dtbs
     install -m 0644 /dt/*.dtb ${D}/boot/dtbs/ 2>/dev/null || bbwarn "No .dtb files found in /dt"
-    if [ -f "/dt/${HERMES_EXTERNAL_DTB}" ]; then
-        install -m 0644 "/dt/${HERMES_EXTERNAL_DTB}" ${D}/boot/system.dtb
-        bbnote "Installed boot DTB as /boot/system.dtb from /dt/${HERMES_EXTERNAL_DTB}"
-    elif [ -f "/dt/system-top.dtb" ]; then
-        install -m 0644 "/dt/system-top.dtb" ${D}/boot/system.dtb
-        bbwarn "HERMES_EXTERNAL_DTB not found in /dt; fell back to /dt/system-top.dtb for /boot/system.dtb"
-    else
-        bbwarn "No external DTB found for /boot/system.dtb; system may boot with a default device tree"
-    fi
     install -d ${D}${sbindir}
     install -m 0755 ${WORKDIR}/hermes-autoexpand-rootfs.sh ${D}${sbindir}/hermes-autoexpand-rootfs
     install -m 0755 ${WORKDIR}/hermes-load-bitstream.sh ${D}${sbindir}/hermes-load-bitstream
@@ -85,9 +77,10 @@ do_install () {
     install -d ${D}${nonarch_base_libdir}/firmware
     if [ -f "/dt/pl-overlay.dts" ]; then
         install -m 0644 /dt/pl-overlay.dts ${D}${nonarch_base_libdir}/firmware/pl-overlay.dts
-        bbnote "Installed pl-overlay.dts for device tree overlay support"
+        bbnote "Installed pl-overlay.dts from /dt for device tree overlay support"
     else
-        bbwarn "pl-overlay.dts not found in /dt - runtime device tree updates will not work"
+        install -m 0644 ${WORKDIR}/pl-overlay.dts ${D}${nonarch_base_libdir}/firmware/pl-overlay.dts
+        bbwarn "pl-overlay.dts not found in /dt - using layer fallback file"
     fi
     install -d ${D}${sysconfdir}/dfx-mgrd
     printf '%s\n' "${HERMES_DEFAULT_ACCEL}" > ${D}${sysconfdir}/dfx-mgrd/default_firmware
@@ -98,7 +91,6 @@ do_install () {
 
 FILES:${PN} += " \
     ${nonarch_base_libdir}/firmware/* \
-    /boot/system.dtb \
     /boot/dtbs/* \
     ${sbindir}/hermes-autoexpand-rootfs \
     ${sbindir}/hermes-load-bitstream \
