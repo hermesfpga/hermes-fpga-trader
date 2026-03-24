@@ -150,3 +150,10 @@ devicetree:
 
 	# record the build ID
 	printf '%s' "$$DT_BUILD_PATH" > $(LATEST_DT_FILE)
+
+# Run fast unit tests locally — no Docker, no Vivado, no Yocto.
+# Tests mock the sysfs/configfs filesystem in /tmp and run in seconds.
+# Requires: sh (dash/bash), dtc optional (overlay compilation tests skip if absent).
+test:
+	@echo "Running hermes unit tests..."
+	bash $(PROJECT_PATH)/tests/run_tests.sh

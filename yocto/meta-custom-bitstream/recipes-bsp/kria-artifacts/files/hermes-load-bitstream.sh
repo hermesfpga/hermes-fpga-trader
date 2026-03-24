@@ -1,10 +1,17 @@
 #!/bin/sh
 set -eu
 
-FW_FILE="/etc/hermes/bitstream-firmware"
-FPGA_FLAGS="/sys/class/fpga_manager/fpga0/flags"
-FPGA_FW="/sys/class/fpga_manager/fpga0/firmware"
-FPGA_STATE="/sys/class/fpga_manager/fpga0/state"
+# HERMES_ROOT: optional prefix for all system paths. Set in unit tests to redirect
+# sysfs, firmware, and config paths to a temporary mock root. Defaults to empty.
+HERMES_ROOT="${HERMES_ROOT:-}"
+
+# HERMES_OVERLAY_LOADER: path to overlay loader binary. Override in tests to inject a mock.
+HERMES_OVERLAY_LOADER="${HERMES_OVERLAY_LOADER:-/usr/sbin/hermes-load-overlay}"
+
+FW_FILE="${HERMES_ROOT}/etc/hermes/bitstream-firmware"
+FPGA_FLAGS="${HERMES_ROOT}/sys/class/fpga_manager/fpga0/flags"
+FPGA_FW="${HERMES_ROOT}/sys/class/fpga_manager/fpga0/firmware"
+FPGA_STATE="${HERMES_ROOT}/sys/class/fpga_manager/fpga0/state"
 
 if [ ! -f "$FW_FILE" ]; then
     echo "hermes-load-bitstream: missing $FW_FILE" >&2
@@ -19,8 +26,8 @@ if [ -z "$BIT_NAME" ]; then
     exit 1
 fi
 
-if [ ! -f "/lib/firmware/$BIT_NAME" ]; then
-    echo "hermes-load-bitstream: /lib/firmware/$BIT_NAME not found" >&2
+if [ ! -f "${HERMES_ROOT}/lib/firmware/$BIT_NAME" ]; then
+    echo "hermes-load-bitstream: ${HERMES_ROOT}/lib/firmware/$BIT_NAME not found" >&2
     exit 1
 fi
 
@@ -40,7 +47,7 @@ if [ -r "$FPGA_STATE" ]; then
         operating)
             # Bitstream loaded successfully, now update device tree
             echo "hermes-load-bitstream: loading programmable logic device tree overlay..."
-            if ! /usr/sbin/hermes-load-overlay "pl-overlay"; then
+            if ! "${HERMES_OVERLAY_LOADER}" "pl-overlay"; then
                 echo "hermes-load-bitstream: warning - device tree overlay load failed" >&2
                 # Don't fail - bitstream is loaded, overlay might be optional
             fi

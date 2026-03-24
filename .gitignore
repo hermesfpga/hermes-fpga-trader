@@ -9,3 +9,4 @@ vivado/
 # OS
 .DS_Store
 Thumbs.db
+/dt_example/dt

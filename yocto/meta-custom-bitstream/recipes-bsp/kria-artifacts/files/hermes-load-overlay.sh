@@ -4,27 +4,33 @@ set -eu
 # Device tree overlay loading helper for runtime FPGA programming
 # This allows the kernel's device tree to be updated when a new bitstream is loaded
 
+# HERMES_ROOT: optional prefix for all system paths. Set in unit tests to redirect
+# sysfs, firmware, and config paths to a temporary mock root. Defaults to empty.
+HERMES_ROOT="${HERMES_ROOT:-}"
+
 OVERLAY_NAME="${1:-pl-overlay}"
-OVERLAY_DTBO="/lib/firmware/${OVERLAY_NAME}.dtbo"
+FIRMWARE_DIR="${HERMES_ROOT}/lib/firmware"
+OVERLAY_DTS="${FIRMWARE_DIR}/${OVERLAY_NAME}.dts"
+OVERLAY_DTBO="${FIRMWARE_DIR}/${OVERLAY_NAME}.dtbo"
 DTC_FLAGS="-@ -q -O dtb"
 
-if [ ! -f "/lib/firmware/${OVERLAY_NAME}.dts" ]; then
-    echo "hermes-load-overlay: source not found: /lib/firmware/${OVERLAY_NAME}.dts" >&2
+if [ ! -f "$OVERLAY_DTS" ]; then
+    echo "hermes-load-overlay: source not found: $OVERLAY_DTS" >&2
     exit 1
 fi
 
 # Compile overlay if .dtbo doesn't exist or is older than .dts
-if [ ! -f "$OVERLAY_DTBO" ] || [ "/lib/firmware/${OVERLAY_NAME}.dts" -nt "$OVERLAY_DTBO" ]; then
+if [ ! -f "$OVERLAY_DTBO" ] || [ "$OVERLAY_DTS" -nt "$OVERLAY_DTBO" ]; then
     echo "hermes-load-overlay: compiling ${OVERLAY_NAME}..."
-    if ! dtc ${DTC_FLAGS} -i "/sys/firmware/devicetree/base" \
-        -o "$OVERLAY_DTBO" "/lib/firmware/${OVERLAY_NAME}.dts"; then
+    if ! dtc ${DTC_FLAGS} -i "${HERMES_ROOT}/sys/firmware/devicetree/base" \
+        -o "$OVERLAY_DTBO" "$OVERLAY_DTS"; then
         echo "hermes-load-overlay: failed to compile overlay" >&2
         exit 1
     fi
 fi
 
 # Load overlay into kernel device tree
-DT_OVERLAY_DIR="/sys/kernel/config/device-tree/overlays"
+DT_OVERLAY_DIR="${HERMES_ROOT}/sys/kernel/config/device-tree/overlays"
 if [ ! -d "$DT_OVERLAY_DIR" ]; then
     echo "hermes-load-overlay: devicetree configfs not mounted" >&2
     echo "  (requires: CONFIG_OF_CONFIGFS in kernel)" >&2
