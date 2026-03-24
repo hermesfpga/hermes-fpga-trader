@@ -48,8 +48,9 @@ if [ -r "$FPGA_STATE" ]; then
             # Bitstream loaded successfully, now update device tree
             echo "hermes-load-bitstream: loading programmable logic device tree overlay..."
             if ! "${HERMES_OVERLAY_LOADER}" "pl-overlay"; then
-                echo "hermes-load-bitstream: warning - device tree overlay load failed" >&2
-                # Don't fail - bitstream is loaded, overlay might be optional
+                echo "hermes-load-bitstream: device tree overlay load failed" >&2
+                echo "hermes-load-bitstream: refusing to continue with mismatched PL/device-tree state" >&2
+                exit 1
             fi
             exit 0
             ;;

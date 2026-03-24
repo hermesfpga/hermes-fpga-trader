@@ -11,7 +11,8 @@ HERMES_ROOT="${HERMES_ROOT:-}"
 OVERLAY_NAME="${1:-pl-overlay}"
 FIRMWARE_DIR="${HERMES_ROOT}/lib/firmware"
 OVERLAY_DTS="${FIRMWARE_DIR}/${OVERLAY_NAME}.dts"
-OVERLAY_DTBO="${FIRMWARE_DIR}/${OVERLAY_NAME}.dtbo"
+RUNTIME_DIR="${HERMES_ROOT}/run/hermes-overlay"
+OVERLAY_DTBO="${RUNTIME_DIR}/${OVERLAY_NAME}.dtbo"
 DTC_FLAGS="-@ -q -O dtb"
 
 if [ ! -f "$OVERLAY_DTS" ]; then
@@ -20,6 +21,7 @@ if [ ! -f "$OVERLAY_DTS" ]; then
 fi
 
 # Compile overlay if .dtbo doesn't exist or is older than .dts
+mkdir -p "$RUNTIME_DIR"
 if [ ! -f "$OVERLAY_DTBO" ] || [ "$OVERLAY_DTS" -nt "$OVERLAY_DTBO" ]; then
     echo "hermes-load-overlay: compiling ${OVERLAY_NAME}..."
     if ! dtc ${DTC_FLAGS} -i "${HERMES_ROOT}/sys/firmware/devicetree/base" \

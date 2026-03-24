@@ -6,7 +6,6 @@ SRC_URI = " \
     file://hermes-load-bitstream.sh \
     file://hermes-load-bitstream.service \
     file://hermes-load-overlay.sh \
-    file://pl-overlay.dts \
 "
 
 inherit allarch systemd
@@ -75,13 +74,11 @@ do_install () {
     install -d ${D}${sysconfdir}/hermes
     printf '%s\n' "${SELECTED_BIT}" > ${D}${sysconfdir}/hermes/bitstream-firmware
     install -d ${D}${nonarch_base_libdir}/firmware
-    if [ -f "/dt/pl-overlay.dts" ]; then
-        install -m 0644 /dt/pl-overlay.dts ${D}${nonarch_base_libdir}/firmware/pl-overlay.dts
-        bbnote "Installed pl-overlay.dts from /dt for device tree overlay support"
-    else
-        install -m 0644 ${WORKDIR}/pl-overlay.dts ${D}${nonarch_base_libdir}/firmware/pl-overlay.dts
-        bbwarn "pl-overlay.dts not found in /dt - using layer fallback file"
+    if [ ! -f "/dt/pl-overlay.dts" ]; then
+        bbfatal "Required overlay source missing: /dt/pl-overlay.dts (must match generated bitstream)"
     fi
+    install -m 0644 /dt/pl-overlay.dts ${D}${nonarch_base_libdir}/firmware/pl-overlay.dts
+    bbnote "Installed pl-overlay.dts from /dt for runtime device tree overlay support"
     install -d ${D}${sysconfdir}/dfx-mgrd
     printf '%s\n' "${HERMES_DEFAULT_ACCEL}" > ${D}${sysconfdir}/dfx-mgrd/default_firmware
     bbnote "Installed files:"
