@@ -7,6 +7,9 @@ XSA_FILE = $(PROJECT_NAME).xsa
 BIT_FILE = $(PROJECT_NAME).bit
 BIN_FILE = $(PROJECT_NAME).bin
 GENERATE_PL_OVERLAY = /workspace/scripts/generate_pl_overlay.py
+DEVICETREE_LOG_DIR ?= $(PROJECT_PATH)/output/devicetree-logs
+BUILD_PATH_OVERRIDE ?=
+GENERATE_PL_OVERLAY_HOST = $(PROJECT_PATH)/scripts/generate_pl_overlay.py
 
 # Host path where artifacts are stored
 ARTIFACTS_HOST_DIR = /home/buildserver/artifacts
@@ -120,8 +123,16 @@ report:
 
 
 devicetree:
-	test -f $(LATEST_BUILD_FILE)
-	BUILD_PATH="$$(cat $(LATEST_BUILD_FILE))"
+	if [ -n "$(BUILD_PATH_OVERRIDE)" ]; then \
+		BUILD_PATH_RAW="$(BUILD_PATH_OVERRIDE)"; \
+	else \
+		test -f $(LATEST_BUILD_FILE); \
+		BUILD_PATH_RAW="$$(cat $(LATEST_BUILD_FILE))"; \
+	fi
+	case "$$BUILD_PATH_RAW" in \
+		*/vivado) BUILD_PATH="$$BUILD_PATH_RAW" ;; \
+		*) BUILD_PATH="$$BUILD_PATH_RAW/vivado" ;; \
+	esac
 	DT_BUILD_PATH=$$(dirname "$$BUILD_PATH")/dt
 	mkdir -p $(ARTIFACTS_HOST_DIR)/$$DT_BUILD_PATH
 
@@ -136,10 +147,26 @@ devicetree:
 		bash -lc ' \
 			BUILD_PATH='"$$BUILD_PATH"' && \
 			DT_BUILD_PATH='"$$DT_BUILD_PATH"' && \
-			PYTHON_BIN=$$(command -v python3 || command -v python || true) && \
-			test -n "$$PYTHON_BIN" && \
 			xsct -eval "sdtgen set_dt_param -xsa $(ARTIFACTS_CONTAINER_DIR)/$$BUILD_PATH/$(XSA_FILE) -dir $(ARTIFACTS_CONTAINER_DIR)/$$DT_BUILD_PATH; sdtgen generate_sdt; exit" && \
-			"$$PYTHON_BIN" $(GENERATE_PL_OVERLAY) $(ARTIFACTS_CONTAINER_DIR)/$$DT_BUILD_PATH/pl.dtsi $(ARTIFACTS_CONTAINER_DIR)/$$DT_BUILD_PATH/pl-overlay.dts && \
+			ls $(ARTIFACTS_CONTAINER_DIR)/$$DT_BUILD_PATH \
+		' || exit 1
+
+	HOST_PYTHON_BIN=$$(command -v python3 || command -v python || true)
+	if [ -z "$$HOST_PYTHON_BIN" ]; then echo "ERROR: no python interpreter found on host"; exit 1; fi
+	echo "INFO: Using host Python interpreter $$HOST_PYTHON_BIN"
+	"$$HOST_PYTHON_BIN" "$(GENERATE_PL_OVERLAY_HOST)" "$(ARTIFACTS_HOST_DIR)/$$DT_BUILD_PATH/pl.dtsi" "$(ARTIFACTS_HOST_DIR)/$$DT_BUILD_PATH/pl-overlay.dts"
+
+	docker run --network bridge \
+		--rm \
+		-e LOCAL_UID=$$(id -u) \
+		-e LOCAL_GID=$$(id -g) \
+		-v ${PROJECT_PATH}:/workspace:rw \
+		-v $(ARTIFACTS_HOST_DIR):$(ARTIFACTS_CONTAINER_DIR):rw \
+		-w /workspace \
+		$(DOCKER_IMAGE_VIVADO) \
+		bash -lc ' \
+			BUILD_PATH='"$$BUILD_PATH"' && \
+			DT_BUILD_PATH='"$$DT_BUILD_PATH"' && \
 			gcc -I $(ARTIFACTS_CONTAINER_DIR)/$$DT_BUILD_PATH -E -nostdinc -undef -D__DTS__ -x assembler-with-cpp \
 				-o $(ARTIFACTS_CONTAINER_DIR)/$$DT_BUILD_PATH/system-top.dts.tmp \
 				$(ARTIFACTS_CONTAINER_DIR)/$$DT_BUILD_PATH/system-top.dts && \
@@ -154,6 +181,12 @@ devicetree:
 
 	# record the build ID
 	printf '%s' "$$DT_BUILD_PATH" > $(LATEST_DT_FILE)
+
+devicetree_logged:
+	mkdir -p "$(DEVICETREE_LOG_DIR)"
+	LOG_FILE="$(DEVICETREE_LOG_DIR)/devicetree-$$(date +%Y%m%d_%H%M%S).log"
+	bash -lc 'set -o pipefail; $(MAKE) devicetree BUILD_PATH_OVERRIDE="$(BUILD_PATH_OVERRIDE)" 2>&1 | tee "$$0"' "$$LOG_FILE"
+	printf 'Devicetree log: %s\n' "$$LOG_FILE"
 
 # Run fast unit tests locally — no Docker, no Vivado, no Yocto.
 # Tests mock the sysfs/configfs filesystem in /tmp and run in seconds.

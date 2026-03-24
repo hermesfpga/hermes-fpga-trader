@@ -10,7 +10,9 @@ SRC_URI = " \
 
 inherit allarch systemd
 
-SYSTEMD_SERVICE:${PN} = "hermes-autoexpand-rootfs.service hermes-load-bitstream.service"
+# Boot-safe default: expand rootfs automatically, but do not auto-load PL
+# bitstream/overlay until hardware path is validated.
+SYSTEMD_SERVICE:${PN} = "hermes-autoexpand-rootfs.service"
 SYSTEMD_AUTO_ENABLE:${PN} = "enable"
 
 RDEPENDS:${PN} += " \

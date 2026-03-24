@@ -56,6 +56,7 @@ LOCAL_YOCTO_BUILD_PATH ?= local/$(shell date +%Y%m%d_%H%M%S)/yocto
 LOCAL_LATEST_YOCTO_BUILD_FILE ?= $(LOCAL_ARTIFACTS_HOST_DIR)/$(PROJECT_NAME)_latest_yocto_build.txt
 
 build_yocto:
+	set -e
 	test -f $(LATEST_DT_FILE)
 	test -f $(LATEST_BUILD_FILE)
 	test -f $(BUILD_SD_BOOT_SCRIPT_HOST)
@@ -69,6 +70,9 @@ build_yocto:
 	@echo "DEBUG: YOCTO_BUILD_PATH=$$YOCTO_BUILD_PATH"
 	mkdir -p $(ARTIFACTS_HOST_DIR)/$$YOCTO_BUILD_PATH
 	touch $(ARTIFACTS_HOST_DIR)/$$YOCTO_BUILD_PATH/yocto.log
+	YOCTO_LOG_PATH="$(ARTIFACTS_HOST_DIR)/$$YOCTO_BUILD_PATH/yocto.log"
+	@echo "Running Yocto build. Log: $$YOCTO_LOG_PATH"
+	DOCKER_EXIT=0
 	docker run --rm \
 		-e LOCAL_UID=$$(id -u) \
 		-e LOCAL_GID=$$(id -g) \
@@ -86,21 +90,34 @@ build_yocto:
 		-v "$(LAYER_PATH)":$(LAYER_CONTAINER_PATH):ro \
 		-v "$(BUILD_SD_BOOT_SCRIPT_HOST)":$(BUILD_SD_BOOT_SCRIPT_CONTAINER):ro \
 		$(DOCKER_IMAGE_YOCTO) \
-		bash -lc "tr -d '\\r' < $(BUILD_SD_BOOT_SCRIPT_CONTAINER) > /tmp/build_sd_boot.sh && chmod +x /tmp/build_sd_boot.sh && /tmp/build_sd_boot.sh"
+		bash -lc "tr -d '\\r' < $(BUILD_SD_BOOT_SCRIPT_CONTAINER) > /tmp/build_sd_boot.sh && chmod +x /tmp/build_sd_boot.sh && /tmp/build_sd_boot.sh" || DOCKER_EXIT=$$?
+	if [ $$DOCKER_EXIT -ne 0 ]; then \
+		echo "ERROR: Yocto docker build failed with exit code $$DOCKER_EXIT"; \
+		if [ -f "$$YOCTO_LOG_PATH" ]; then \
+			echo "Last 80 lines of $$YOCTO_LOG_PATH:"; \
+			tail -n 80 "$$YOCTO_LOG_PATH" || true; \
+		fi; \
+		exit $$DOCKER_EXIT; \
+	fi
 
 	# record the build ID even if bitbake failed
 	printf '%s' "$$YOCTO_BUILD_PATH" > $(LATEST_YOCTO_BUILD_FILE)
 
 build_yocto_local:
+	set -e
 	test -d "$(LOCAL_DT_DIR)"
 	test -f $(BUILD_SD_BOOT_SCRIPT_HOST)
 	test -f $(GENERATE_PL_OVERLAY_HOST)
 	PYTHON_BIN=$$(command -v python3 || command -v python || true)
-	test -n "$$PYTHON_BIN"
+	if [ -z "$$PYTHON_BIN" ]; then echo "ERROR: no python interpreter found on host"; exit 1; fi
+	@echo "Using Python interpreter $$PYTHON_BIN"
 	"$$PYTHON_BIN" "$(GENERATE_PL_OVERLAY_HOST)" "$(LOCAL_DT_DIR)/pl.dtsi" "$(LOCAL_DT_DIR)/pl-overlay.dts"
 	mkdir -p "$(LOCAL_ARTIFACTS_HOST_DIR)/$(LOCAL_YOCTO_BUILD_PATH)"
 	mkdir -p "$(LOCAL_YOCTO_DOWNLOADS_HOST_DIR)" "$(LOCAL_YOCTO_SSTATE_HOST_DIR)"
 	touch "$(LOCAL_ARTIFACTS_HOST_DIR)/$(LOCAL_YOCTO_BUILD_PATH)/yocto.log"
+	YOCTO_LOG_PATH="$(LOCAL_ARTIFACTS_HOST_DIR)/$(LOCAL_YOCTO_BUILD_PATH)/yocto.log"
+	@echo "Running local Yocto build. Log: $$YOCTO_LOG_PATH"
+	DOCKER_EXIT=0
 	docker run --rm \
 		-e LOCAL_UID=$$(id -u) \
 		-e LOCAL_GID=$$(id -g) \
@@ -118,7 +135,15 @@ build_yocto_local:
 		-v "$(LAYER_PATH)":$(LAYER_CONTAINER_PATH):ro \
 		-v "$(BUILD_SD_BOOT_SCRIPT_HOST)":$(BUILD_SD_BOOT_SCRIPT_CONTAINER):ro \
 		$(DOCKER_IMAGE_YOCTO) \
-		bash -lc "tr -d '\\r' < $(BUILD_SD_BOOT_SCRIPT_CONTAINER) > /tmp/build_sd_boot.sh && chmod +x /tmp/build_sd_boot.sh && /tmp/build_sd_boot.sh"
+		bash -lc "tr -d '\\r' < $(BUILD_SD_BOOT_SCRIPT_CONTAINER) > /tmp/build_sd_boot.sh && chmod +x /tmp/build_sd_boot.sh && /tmp/build_sd_boot.sh" || DOCKER_EXIT=$$?
+	if [ $$DOCKER_EXIT -ne 0 ]; then \
+		echo "ERROR: Local Yocto docker build failed with exit code $$DOCKER_EXIT"; \
+		if [ -f "$$YOCTO_LOG_PATH" ]; then \
+			echo "Last 80 lines of $$YOCTO_LOG_PATH:"; \
+			tail -n 80 "$$YOCTO_LOG_PATH" || true; \
+		fi; \
+		exit $$DOCKER_EXIT; \
+	fi
 
 	printf '%s' "$(LOCAL_YOCTO_BUILD_PATH)" > $(LOCAL_LATEST_YOCTO_BUILD_FILE)
 	@echo "Local Yocto build complete."
