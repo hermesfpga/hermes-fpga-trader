@@ -75,7 +75,7 @@ build_bitstream:
 				2>&1 | tee $(ARTIFACTS_CONTAINER_DIR)/$(VIVADO_REL)/vivado.log ; \
 			cp $(VIVADO_EXPORT_DIR)/$(XSA_FILE) $(ARTIFACTS_CONTAINER_DIR)/$(VIVADO_REL)/$(XSA_FILE) && \
 			cp $(VIVADO_EXPORT_DIR)/$(BIT_FILE) $(ARTIFACTS_CONTAINER_DIR)/$(VIVADO_REL)/$(BIT_FILE) && \
-			cp $(IMPL_RUN_DIR)/*.ltx $(ARTIFACTS_CONTAINER_DIR)/$(VIVADO_REL)/ 2>/dev/null || true && \
+			if ls $(IMPL_RUN_DIR)/*.ltx >/dev/null 2>&1; then cp $(IMPL_RUN_DIR)/*.ltx $(ARTIFACTS_CONTAINER_DIR)/$(VIVADO_REL)/; else echo "No LTX file found in $(IMPL_RUN_DIR); continuing without debug nets"; fi && \
 			echo 'all: { [destination_device=pl] $(ARTIFACTS_CONTAINER_DIR)/$(VIVADO_REL)/$(BIT_FILE) }' > /tmp/$(PROJECT_NAME).bif && \
 			bootgen -arch zynqmp -image /tmp/$(PROJECT_NAME).bif -process_bitstream bin -o $(ARTIFACTS_CONTAINER_DIR)/$(VIVADO_REL)/$(BIN_FILE) -w on && \
 			ls -l $(ARTIFACTS_CONTAINER_DIR)/$(VIVADO_REL) \
@@ -144,7 +144,7 @@ devicetree:
 				$(ARTIFACTS_CONTAINER_DIR)/$$DT_BUILD_PATH/system-top.dts.tmp && \
 			cp $(ARTIFACTS_CONTAINER_DIR)/$$BUILD_PATH/$(BIT_FILE) $(ARTIFACTS_CONTAINER_DIR)/$$DT_BUILD_PATH/$(BIT_FILE) && \
 			cp $(ARTIFACTS_CONTAINER_DIR)/$$BUILD_PATH/$(XSA_FILE) $(ARTIFACTS_CONTAINER_DIR)/$$DT_BUILD_PATH/$(XSA_FILE) && \
-			cp $(ARTIFACTS_CONTAINER_DIR)/$$BUILD_PATH/*.ltx $(ARTIFACTS_CONTAINER_DIR)/$$DT_BUILD_PATH/ 2>/dev/null || true && \
+			if ls $(ARTIFACTS_CONTAINER_DIR)/$$BUILD_PATH/*.ltx >/dev/null 2>&1; then cp $(ARTIFACTS_CONTAINER_DIR)/$$BUILD_PATH/*.ltx $(ARTIFACTS_CONTAINER_DIR)/$$DT_BUILD_PATH/; else echo "No LTX in build artifacts; continuing without debug nets"; fi && \
 			ls $(ARTIFACTS_CONTAINER_DIR)/$$DT_BUILD_PATH \
 		' || exit 1
 

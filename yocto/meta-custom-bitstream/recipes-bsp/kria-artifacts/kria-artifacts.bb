@@ -5,6 +5,7 @@ SRC_URI = " \
     file://hermes-autoexpand-rootfs.service \
     file://hermes-load-bitstream.sh \
     file://hermes-load-bitstream.service \
+    file://hermes-load-overlay.sh \
 "
 
 inherit allarch systemd
@@ -15,6 +16,7 @@ SYSTEMD_AUTO_ENABLE:${PN} = "enable"
 RDEPENDS:${PN} += " \
     coreutils \
     devmem2 \
+    device-tree-compiler \
     e2fsprogs-resize2fs \
     parted \
     procps \
@@ -65,11 +67,19 @@ do_install () {
     install -d ${D}${sbindir}
     install -m 0755 ${WORKDIR}/hermes-autoexpand-rootfs.sh ${D}${sbindir}/hermes-autoexpand-rootfs
     install -m 0755 ${WORKDIR}/hermes-load-bitstream.sh ${D}${sbindir}/hermes-load-bitstream
+    install -m 0755 ${WORKDIR}/hermes-load-overlay.sh ${D}${sbindir}/hermes-load-overlay
     install -d ${D}${systemd_system_unitdir}
     install -m 0644 ${WORKDIR}/hermes-autoexpand-rootfs.service ${D}${systemd_system_unitdir}/
     install -m 0644 ${WORKDIR}/hermes-load-bitstream.service ${D}${systemd_system_unitdir}/
     install -d ${D}${sysconfdir}/hermes
     printf '%s\n' "${SELECTED_BIT}" > ${D}${sysconfdir}/hermes/bitstream-firmware
+    install -d ${D}${nonarch_base_libdir}/firmware
+    if [ -f "/dt/pl-overlay.dts" ]; then
+        install -m 0644 /dt/pl-overlay.dts ${D}${nonarch_base_libdir}/firmware/pl-overlay.dts
+        bbnote "Installed pl-overlay.dts for device tree overlay support"
+    else
+        bbwarn "pl-overlay.dts not found in /dt - runtime device tree updates will not work"
+    fi
     install -d ${D}${sysconfdir}/dfx-mgrd
     printf '%s\n' "${HERMES_DEFAULT_ACCEL}" > ${D}${sysconfdir}/dfx-mgrd/default_firmware
     bbnote "Installed files:"
@@ -82,6 +92,7 @@ FILES:${PN} += " \
     /boot/dtbs/* \
     ${sbindir}/hermes-autoexpand-rootfs \
     ${sbindir}/hermes-load-bitstream \
+    ${sbindir}/hermes-load-overlay \
     ${sysconfdir}/hermes/bitstream-firmware \
     ${sysconfdir}/dfx-mgrd/default_firmware \
     ${systemd_system_unitdir}/hermes-autoexpand-rootfs.service \
