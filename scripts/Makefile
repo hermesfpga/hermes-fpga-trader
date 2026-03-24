@@ -6,6 +6,7 @@ PROJECT_NAME = kria_zynq
 XSA_FILE = $(PROJECT_NAME).xsa
 BIT_FILE = $(PROJECT_NAME).bit
 BIN_FILE = $(PROJECT_NAME).bin
+GENERATE_PL_OVERLAY = /workspace/scripts/generate_pl_overlay.py
 
 # Host path where artifacts are stored
 ARTIFACTS_HOST_DIR = /home/buildserver/artifacts
@@ -135,7 +136,10 @@ devicetree:
 		bash -lc ' \
 			BUILD_PATH='"$$BUILD_PATH"' && \
 			DT_BUILD_PATH='"$$DT_BUILD_PATH"' && \
+			PYTHON_BIN=$$(command -v python3 || command -v python || true) && \
+			test -n "$$PYTHON_BIN" && \
 			xsct -eval "sdtgen set_dt_param -xsa $(ARTIFACTS_CONTAINER_DIR)/$$BUILD_PATH/$(XSA_FILE) -dir $(ARTIFACTS_CONTAINER_DIR)/$$DT_BUILD_PATH; sdtgen generate_sdt; exit" && \
+			"$$PYTHON_BIN" $(GENERATE_PL_OVERLAY) $(ARTIFACTS_CONTAINER_DIR)/$$DT_BUILD_PATH/pl.dtsi $(ARTIFACTS_CONTAINER_DIR)/$$DT_BUILD_PATH/pl-overlay.dts && \
 			gcc -I $(ARTIFACTS_CONTAINER_DIR)/$$DT_BUILD_PATH -E -nostdinc -undef -D__DTS__ -x assembler-with-cpp \
 				-o $(ARTIFACTS_CONTAINER_DIR)/$$DT_BUILD_PATH/system-top.dts.tmp \
 				$(ARTIFACTS_CONTAINER_DIR)/$$DT_BUILD_PATH/system-top.dts && \

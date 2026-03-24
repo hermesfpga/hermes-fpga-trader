@@ -5,7 +5,7 @@
 PROJECT_NAME = kria_zynq
 
 # Host path where artifacts are stored
-ARTIFACTS_HOST_DIR = /home/buildserver/artifacts
+ARTIFACTS_HOST_DIR ?= /home/buildserver/artifacts
 
 # Path to artifacts inside the container
 ARTIFACTS_CONTAINER_DIR = /artifacts
@@ -17,13 +17,14 @@ LAYER_CONTAINER_PATH = /workspace/meta-custom-bitstream
 # Path to in-container Yocto build helper script
 BUILD_SD_BOOT_SCRIPT_HOST = $(realpath ./build_sd_boot.sh)
 BUILD_SD_BOOT_SCRIPT_CONTAINER = /workspace/build_sd_boot.sh
+GENERATE_PL_OVERLAY_HOST = $(abspath ../../scripts/generate_pl_overlay.py)
 
 # Yocto build settings
-DOCKER_IMAGE_YOCTO_NAME = yocto_builder
-DOCKER_IMAGE_YOCTO_TAG  = v1
+DOCKER_IMAGE_YOCTO_NAME ?= yocto_builder
+DOCKER_IMAGE_YOCTO_TAG  ?= v1
 DOCKER_IMAGE_YOCTO      = $(DOCKER_IMAGE_YOCTO_NAME):$(DOCKER_IMAGE_YOCTO_TAG)
 
-YOCTO_CACHE_HOST_DIR     = /home/buildserver/yocto_cache
+YOCTO_CACHE_HOST_DIR     ?= /home/buildserver/yocto_cache
 YOCTO_DOWNLOADS_HOST_DIR = $(YOCTO_CACHE_HOST_DIR)/downloads
 YOCTO_SSTATE_HOST_DIR    = $(YOCTO_CACHE_HOST_DIR)/sstate
 
@@ -43,6 +44,16 @@ LATEST_BUILD_FILE = $(ARTIFACTS_HOST_DIR)/$(PROJECT_NAME)_latest_build.txt
 
 # File storing the most recent successful Yocto build folder
 LATEST_YOCTO_BUILD_FILE = $(ARTIFACTS_HOST_DIR)/$(PROJECT_NAME)_latest_yocto_build.txt
+
+# Local developer workflow (no push required): build from workspace and stage
+# artifacts under output/yocto-local.
+LOCAL_ARTIFACTS_HOST_DIR ?= $(abspath ../../output/yocto-local)
+LOCAL_YOCTO_CACHE_HOST_DIR ?= $(abspath ../../.cache/yocto)
+LOCAL_YOCTO_DOWNLOADS_HOST_DIR ?= $(LOCAL_YOCTO_CACHE_HOST_DIR)/downloads
+LOCAL_YOCTO_SSTATE_HOST_DIR ?= $(LOCAL_YOCTO_CACHE_HOST_DIR)/sstate
+LOCAL_DT_DIR ?= $(abspath ../../dt_example/dt)
+LOCAL_YOCTO_BUILD_PATH ?= local/$(shell date +%Y%m%d_%H%M%S)/yocto
+LOCAL_LATEST_YOCTO_BUILD_FILE ?= $(LOCAL_ARTIFACTS_HOST_DIR)/$(PROJECT_NAME)_latest_yocto_build.txt
 
 build_yocto:
 	test -f $(LATEST_DT_FILE)
@@ -75,10 +86,44 @@ build_yocto:
 		-v "$(LAYER_PATH)":$(LAYER_CONTAINER_PATH):ro \
 		-v "$(BUILD_SD_BOOT_SCRIPT_HOST)":$(BUILD_SD_BOOT_SCRIPT_CONTAINER):ro \
 		$(DOCKER_IMAGE_YOCTO) \
-		bash $(BUILD_SD_BOOT_SCRIPT_CONTAINER)
+		bash -lc "tr -d '\\r' < $(BUILD_SD_BOOT_SCRIPT_CONTAINER) > /tmp/build_sd_boot.sh && chmod +x /tmp/build_sd_boot.sh && /tmp/build_sd_boot.sh"
 
 	# record the build ID even if bitbake failed
 	printf '%s' "$$YOCTO_BUILD_PATH" > $(LATEST_YOCTO_BUILD_FILE)
+
+build_yocto_local:
+	test -d "$(LOCAL_DT_DIR)"
+	test -f $(BUILD_SD_BOOT_SCRIPT_HOST)
+	test -f $(GENERATE_PL_OVERLAY_HOST)
+	PYTHON_BIN=$$(command -v python3 || command -v python || true)
+	test -n "$$PYTHON_BIN"
+	"$$PYTHON_BIN" "$(GENERATE_PL_OVERLAY_HOST)" "$(LOCAL_DT_DIR)/pl.dtsi" "$(LOCAL_DT_DIR)/pl-overlay.dts"
+	mkdir -p "$(LOCAL_ARTIFACTS_HOST_DIR)/$(LOCAL_YOCTO_BUILD_PATH)"
+	mkdir -p "$(LOCAL_YOCTO_DOWNLOADS_HOST_DIR)" "$(LOCAL_YOCTO_SSTATE_HOST_DIR)"
+	touch "$(LOCAL_ARTIFACTS_HOST_DIR)/$(LOCAL_YOCTO_BUILD_PATH)/yocto.log"
+	docker run --rm \
+		-e LOCAL_UID=$$(id -u) \
+		-e LOCAL_GID=$$(id -g) \
+		-e YOCTO_IMAGE="$(YOCTO_IMAGE)" \
+		-e YOCTO_MACHINE="$(YOCTO_MACHINE)" \
+		-e YOCTO_DTS_NAME="$(YOCTO_DTS_NAME)" \
+		-e YOCTO_DTB_NAME="$(YOCTO_DTB_NAME)" \
+		-e LAYER_CONTAINER_PATH="$(LAYER_CONTAINER_PATH)" \
+		-e ARTIFACTS_CONTAINER_DIR="$(ARTIFACTS_CONTAINER_DIR)" \
+		-e YOCTO_BUILD_PATH="$(LOCAL_YOCTO_BUILD_PATH)" \
+		-v "$(LOCAL_ARTIFACTS_HOST_DIR)":$(ARTIFACTS_CONTAINER_DIR):rw \
+		-v "$(LOCAL_YOCTO_DOWNLOADS_HOST_DIR)":$(YOCTO_DOWNLOADS_DIR) \
+		-v "$(LOCAL_YOCTO_SSTATE_HOST_DIR)":$(YOCTO_SSTATE_DIR) \
+		-v "$(LOCAL_DT_DIR)":/dt:rw \
+		-v "$(LAYER_PATH)":$(LAYER_CONTAINER_PATH):ro \
+		-v "$(BUILD_SD_BOOT_SCRIPT_HOST)":$(BUILD_SD_BOOT_SCRIPT_CONTAINER):ro \
+		$(DOCKER_IMAGE_YOCTO) \
+		bash -lc "tr -d '\\r' < $(BUILD_SD_BOOT_SCRIPT_CONTAINER) > /tmp/build_sd_boot.sh && chmod +x /tmp/build_sd_boot.sh && /tmp/build_sd_boot.sh"
+
+	printf '%s' "$(LOCAL_YOCTO_BUILD_PATH)" > $(LOCAL_LATEST_YOCTO_BUILD_FILE)
+	@echo "Local Yocto build complete."
+	@echo "Log: $(LOCAL_ARTIFACTS_HOST_DIR)/$(LOCAL_YOCTO_BUILD_PATH)/yocto.log"
+	@echo "Boot artifacts: $(LOCAL_ARTIFACTS_HOST_DIR)/$(LOCAL_YOCTO_BUILD_PATH)/boot"
 
 # generate a formatted error/warning report and (optionally) append to
 # the GitHub Actions step summary.  Accepts BUILD_ID as an environment

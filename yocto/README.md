@@ -26,6 +26,10 @@ cd yocto/scripts && make build_yocto
 
 # Optional per-run overrides
 # make build_yocto YOCTO_DTS_NAME=system-top.dts YOCTO_DTB_NAME=system-top.dtb
+
+# Local developer workflow (build from this repo without pushing)
+# Uses dt_example/dt as /dt input and writes outputs under output/yocto-local/
+make build_yocto_local
 ```
 
 Current artifact layout for one build:
@@ -47,6 +51,7 @@ The `build_yocto` target mounts the device tree directory and uses it in two way
 - Packaged runtime artifacts:
     - Bitstream → `/lib/firmware/`
     - DTB copy → `/boot/dtbs/`
+    - PL overlay DTS (`pl-overlay.dts`) generated from `pl.dtsi`
 
 The Yocto `report` target reads `yocto.log` from that `yocto/` folder and generates `yocto-report.txt`.
 
@@ -59,6 +64,15 @@ After `bitbake` completes, the build also exports the boot disk image into:
 Current export policy copies only `*.wic.xz` from `DEPLOY_DIR_IMAGE`.
 The bitstream and DTB are still packaged in the Yocto image via the custom layer,
 but are not exported as separate files in `yocto/boot/`.
+
+For local developer builds (`make build_yocto_local`), artifacts are staged in:
+
+```
+output/yocto-local/local/<timestamp>/yocto/
+    yocto.log
+    boot/
+        *.wic.xz
+```
 
 ## Reusing the Layer
 
