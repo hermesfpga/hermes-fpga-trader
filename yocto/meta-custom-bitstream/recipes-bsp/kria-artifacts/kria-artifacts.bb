@@ -16,7 +16,7 @@ SYSTEMD_AUTO_ENABLE:${PN} = "enable"
 RDEPENDS:${PN} += " \
     coreutils \
     devmem2 \
-    device-tree-compiler \
+    dtc \
     e2fsprogs-resize2fs \
     parted \
     procps \
