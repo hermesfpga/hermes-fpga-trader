@@ -447,7 +447,7 @@ Port;FD4A0000;FD4AFFFF;1|FPD;DPDMA;FD4C0000;FD4CFFFF;1|FPD;DDR_XMPU5_CFG;FD05000
     CONFIG.PSU__USB__RESET__MODE {Separate MIO Pin} \
     CONFIG.PSU__USB__RESET__POLARITY {Active Low} \
     CONFIG.PSU__USE__FABRIC__RST {1} \
-    CONFIG.PSU__USE__IRQ0 {1} \
+    CONFIG.PSU__USE__IRQ0 {0} \
     CONFIG.PSU__USE__M_AXI_GP2 {1} \
   ] $zynq_ultra_ps_e_0
 
@@ -502,8 +502,6 @@ connect_bd_intf_net -intf_net [get_bd_intf_nets smartconnect_0_M00_AXI] [get_bd_
 connect_bd_intf_net -intf_net [get_bd_intf_nets zynq_ultra_ps_e_0_M_AXI_HPM0_LPD] [get_bd_intf_pins zynq_ultra_ps_e_0/M_AXI_HPM0_LPD] [get_bd_intf_pins system_ila_0/SLOT_0_AXI]
 
   # Create port connections
-  connect_bd_net -net axi_intc_0_irq  [get_bd_pins axi_intc_0/irq] \
-  [get_bd_pins zynq_ultra_ps_e_0/pl_ps_irq0]
   connect_bd_net -net axi_timer_0_interrupt  [get_bd_pins axi_timer_0/interrupt] \
   [get_bd_pins axi_intc_0/intr]
   connect_bd_net -net clk_wiz_0_clk_out1  [get_bd_pins clk_wiz_0/pl_clk] \
